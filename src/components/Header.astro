@@ -159,6 +159,12 @@ const isActive = (path: string) => {
             </li>
           )
         }
+        <li class="hidden sm:flex sm:items-center">
+          <span
+            id="live-clock"
+            class="text-muted font-mono text-sm whitespace-nowrap tabular-nums"
+          >00:00:00</span>
+        </li>
       </ul>
     </nav>
   </div>
@@ -190,6 +196,16 @@ const isActive = (path: string) => {
   }
 
   toggleNav();
+
+  const clock = document.querySelector<HTMLSpanElement>("#live-clock");
+  if (clock) {
+    const tick = () => {
+      const now = new Date();
+      clock.textContent = now.toLocaleTimeString("zh-CN", { hour12: false });
+    };
+    tick();
+    setInterval(tick, 1000);
+  }
 
   document.addEventListener("astro:after-swap", toggleNav);
 </script>
