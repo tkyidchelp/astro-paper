@@ -159,11 +159,14 @@ const isActive = (path: string) => {
             </li>
           )
         }
-        <li class="hidden sm:flex sm:items-center">
-          <span
-            id="live-clock"
-            class="text-muted font-mono text-sm whitespace-nowrap tabular-nums"
-          >00:00:00</span>
+        <li class="hidden sm:flex sm:items-center sm:ml-3">
+          <div id="info-block" class="flex items-center gap-3 text-xs whitespace-nowrap">
+            <span id="live-weather" class="text-accent font-medium">--</span>
+            <span class="text-muted">|</span>
+            <span id="live-date" class="text-muted">----年-月-日</span>
+            <span class="text-muted">|</span>
+            <span id="live-clock" class="text-foreground font-bold font-mono tabular-nums">00:00:00</span>
+          </div>
         </li>
       </ul>
     </nav>
@@ -198,20 +201,68 @@ const isActive = (path: string) => {
   toggleNav();
 
   let clockTimer: ReturnType<typeof setInterval> | undefined;
+
+  const weekDays = ["日", "一", "二", "三", "四", "五", "六"];
+
   function initClock() {
-    const clock = document.querySelector<HTMLSpanElement>("#live-clock");
-    if (!clock) return;
+    const clockEl = document.querySelector<HTMLSpanElement>("#live-clock");
+    const dateEl = document.querySelector<HTMLSpanElement>("#live-date");
+    if (!clockEl || !dateEl) return;
     if (clockTimer) clearInterval(clockTimer);
+
     const tick = () => {
-      clock.textContent = new Date().toLocaleTimeString("zh-CN", { hour12: false });
+      const now = new Date();
+      clockEl.textContent = now.toLocaleTimeString("zh-CN", { hour12: false });
+      const y = now.getFullYear();
+      const m = now.getMonth() + 1;
+      const d = now.getDate();
+      const w = weekDays[now.getDay()];
+      dateEl.textContent = `${y}年${m}月${d}日 周${w}`;
     };
     tick();
     clockTimer = setInterval(tick, 1000);
   }
   initClock();
 
+  const weatherCodes: Record<number, string> = {
+    0: "☀️", 1: "🌤️", 2: "⛅", 3: "☁️",
+    45: "🌫️", 48: "🌫️", 51: "🌦️", 53: "🌦️", 55: "🌧️",
+    61: "🌧️", 63: "🌧️", 65: "🌧️", 71: "🌨️", 73: "🌨️", 75: "🌨️",
+    80: "🌦️", 81: "🌦️", 82: "🌧️", 95: "⛈️", 96: "⛈️", 99: "⛈️",
+  };
+
+  async function fetchWeather(lat: number, lon: number) {
+    try {
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code&timezone=auto`;
+      const res = await fetch(url);
+      const data = await res.json();
+      const temp = Math.round(data.current.temperature_2m);
+      const code = data.current.weather_code;
+      const icon = weatherCodes[code] ?? "🌡️";
+      const el = document.querySelector<HTMLSpanElement>("#live-weather");
+      if (el) el.textContent = `${icon} ${temp}°C`;
+    } catch {
+      const el = document.querySelector<HTMLSpanElement>("#live-weather");
+      if (el) el.textContent = "--°C";
+    }
+  }
+
+  function getLocation() {
+    if ("geolocation" in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        pos => fetchWeather(pos.coords.latitude, pos.coords.longitude),
+        () => fetchWeather(39.9, 116.4), // 默认北京
+        { timeout: 5000 }
+      );
+    } else {
+      fetchWeather(39.9, 116.4);
+    }
+  }
+  getLocation();
+
   document.addEventListener("astro:after-swap", () => {
     toggleNav();
     initClock();
+    getLocation();
   });
 </script>
