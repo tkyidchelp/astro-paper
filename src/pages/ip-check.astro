@@ -55,17 +55,57 @@ const pageTitle = "IP 纯度测试";
       var ip = input.value.trim();
       result.innerHTML = '<div class="flex items-center gap-2"><span class="inline-block size-4 animate-spin rounded-full border-2 border-accent border-t-transparent"></span>查询中...</div>';
 
-      var url = ip
-        ? "https://ipapi.co/" + ip + "/json/"
-        : "https://ipapi.co/json/";
+      var url = "https://ipwhois.app/json/" + (ip || "");
 
       fetch(url)
         .then(function(res) { return res.json(); })
         .then(function(data) {
-          if (data.error) {
-            result.innerHTML = '<p class="text-red-500">查询失败: ' + (data.reason || data.error) + '</p>';
+          if (!data.success) {
+            result.innerHTML = '<p class="text-red-500">查询失败: ' + (data.message || "无效的 IP") + '</p>';
             return;
           }
+          var purity = getPurity(data);
+          result.innerHTML = buildTable(data, purity);
+        })
+        .catch(function() {
+          result.innerHTML = '<p class="text-red-500">网络请求失败，请稍后重试</p>';
+        });
+    }
+
+    function getPurity(d) {
+      var score = 100;
+      var warnings = [];
+      if (d.type !== "IPv4") { score -= 5; }
+      var org = d.org || "";
+      var isp = d.isp || "";
+      if (org.toLowerCase().indexOf("cloud") !== -1 || org.toLowerCase().indexOf("hosting") !== -1) { score -= 30; warnings.push("云服务/托管"); }
+      if (org.toLowerCase().indexOf("google") !== -1) { score -= 15; warnings.push("Google"); }
+      if (org.toLowerCase().indexOf("cloudflare") !== -1) { score -= 10; warnings.push("CDN"); }
+      if (org.toLowerCase().indexOf("amazon") !== -1) { score -= 20; warnings.push("AWS"); }
+      if (org.toLowerCase().indexOf("microsoft") !== -1) { score -= 20; warnings.push("微软云"); }
+      if (org.toLowerCase().indexOf("digitalocean") !== -1) { score -= 25; warnings.push("VPS"); }
+      return { score: Math.max(0, score), warnings: warnings };
+    }
+
+    function buildTable(d, p) {
+      var color = p.score >= 80 ? "text-green-500" : p.score >= 50 ? "text-yellow-500" : "text-red-500";
+      var label = p.score >= 80 ? "纯净" : p.score >= 50 ? "可疑" : "高风险";
+
+      return '<div class="overflow-x-auto"><table class="w-full text-sm"><tbody class="divide-y divide-border">' +
+        '<tr><td class="py-2 pr-4 font-medium whitespace-nowrap">IP 地址</td><td class="py-2">' + d.ip + '</td></tr>' +
+        '<tr><td class="py-2 pr-4 font-medium whitespace-nowrap">国家/地区</td><td class="py-2">' + d.country + ' ' + (d.region || "") + ' ' + (d.city || "") + '</td></tr>' +
+        '<tr><td class="py-2 pr-4 font-medium whitespace-nowrap">ISP</td><td class="py-2">' + d.isp + '</td></tr>' +
+        '<tr><td class="py-2 pr-4 font-medium whitespace-nowrap">组织</td><td class="py-2">' + (d.org || "--") + '</td></tr>' +
+        '<tr><td class="py-2 pr-4 font-medium whitespace-nowrap">ASN</td><td class="py-2">' + (d.asn || "--") + '</td></tr>' +
+        '<tr><td class="py-2 pr-4 font-medium whitespace-nowrap">经纬度</td><td class="py-2">' + d.latitude + ', ' + d.longitude + '</td></tr>' +
+        '<tr><td class="py-2 pr-4 font-medium whitespace-nowrap">时区</td><td class="py-2">' + (d.timezone || "--") + '</td></tr>' +
+        '<tr><td class="py-2 pr-4 font-medium whitespace-nowrap">货币</td><td class="py-2">' + (d.currency || "--") + '</td></tr>' +
+        '<tr class="bg-muted/50"><td class="py-3 pr-4 font-bold whitespace-nowrap">纯净度评分</td><td class="py-3">' +
+        '<span class="' + color + ' text-lg font-bold">' + p.score + ' 分</span>' +
+        '<span class="ml-2 px-2 py-0.5 rounded text-xs font-medium ' + color + ' bg-current/10">' + label + '</span>' +
+        (p.warnings.length ? '<span class="ml-2 text-xs text-muted">(' + p.warnings.join(", ") + ')</span>' : "") +
+        '</td></tr></tbody></table></div>';
+    }
           var purity = getPurity(data);
           result.innerHTML = buildTable(data, purity);
         })
