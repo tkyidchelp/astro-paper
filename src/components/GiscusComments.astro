@@ -1,0 +1,82 @@
+---
+// 访问 https://giscus.app/zh-CN 获取你的 repo-id 和 category-id
+const GISCUS_REPO = "tkyidchelp/astro-paper";
+const GISCUS_REPO_ID = "";      // 填写你的 repo-id
+const GISCUS_CATEGORY = "General";
+const GISCUS_CATEGORY_ID = "";  // 填写你的 category-id
+---
+
+{
+  GISCUS_REPO_ID && GISCUS_CATEGORY_ID ? (
+    <section>
+      <div
+        class="giscus mt-12"
+        data-repo={GISCUS_REPO}
+        data-repo-id={GISCUS_REPO_ID}
+        data-category={GISCUS_CATEGORY}
+        data-category-id={GISCUS_CATEGORY_ID}
+        data-mapping="pathname"
+        data-strict="0"
+        data-reactions-enabled="1"
+        data-emit-metadata="0"
+        data-input-position="bottom"
+        data-theme="preferred_color_scheme"
+        data-lang="zh-CN"
+      />
+    </section>
+  ) : (
+    <div class="border-border mt-12 rounded-lg border p-6 text-center">
+      <p class="text-muted text-sm">
+        评论功能需要配置 Giscus
+      </p>
+      <ol class="text-muted mx-auto mt-3 max-w-md list-decimal text-left text-sm space-y-1">
+        <li>在 <a href="https://github.com/tkyidchelp/astro-paper/settings" target="_blank" rel="noopener noreferrer" class="text-accent underline">GitHub 仓库设置</a> 中启用 Discussions</li>
+        <li>访问 <a href="https://giscus.app/zh-CN" target="_blank" rel="noopener noreferrer" class="text-accent underline">giscus.app</a> 填入仓库信息获取 repo-id 和 category-id</li>
+        <li>安装 <a href="https://github.com/apps/giscus" target="_blank" rel="noopener noreferrer" class="text-accent underline">Giscus GitHub App</a> 到你的仓库</li>
+        <li>将获取到的 ID 填入 <code class="bg-muted rounded px-1">src/components/GiscusComments.astro</code></li>
+      </ol>
+    </div>
+  )
+}
+
+<script is:inline>
+  function loadGiscus() {
+    const el = document.querySelector(".giscus");
+    if (!el || document.querySelector("script[src*='giscus.app']")) return;
+
+    const attrs = [
+      "repo", "repo-id", "category", "category-id", "mapping",
+      "strict", "reactions-enabled", "emit-metadata",
+      "input-position", "theme", "lang",
+    ];
+
+    const script = document.createElement("script");
+    script.src = "https://giscus.app/client.js";
+    script.crossOrigin = "anonymous";
+    script.async = true;
+    for (const attr of attrs) {
+      const val = el.getAttribute("data-" + attr);
+      if (val) script.setAttribute("data-" + attr, val);
+    }
+    el.appendChild(script);
+  }
+
+  loadGiscus();
+
+  document.addEventListener("astro:after-swap", () => {
+    const old = document.querySelector("script[src*='giscus.app']");
+    if (old) old.remove();
+    loadGiscus();
+  });
+
+  function sendGiscusTheme() {
+    const iframe = document.querySelector<HTMLIFrameElement>("iframe.giscus-frame");
+    if (!iframe?.contentWindow) return;
+    const theme = document.documentElement.classList.contains("dark") ? "dark" : "light";
+    iframe.contentWindow.postMessage({ giscus: { setConfig: { theme } } }, "https://giscus.app");
+  }
+
+  const themeObserver = new MutationObserver(() => sendGiscusTheme());
+  themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+  document.addEventListener("astro:after-swap", () => sendGiscusTheme());
+</script>
