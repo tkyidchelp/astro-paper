@@ -161,7 +161,7 @@ const isActive = (path: string) => {
         }
         <li class="hidden sm:flex sm:items-center sm:ml-3">
           <div id="info-block" class="flex items-center gap-3 text-xs whitespace-nowrap">
-            <span id="live-weather" class="text-accent font-medium">--</span>
+            <span id="live-weather" class="text-accent font-medium">📍</span>
             <span class="text-muted">|</span>
             <span id="live-date" class="text-muted">----年-月-日</span>
             <span class="text-muted">|</span>
@@ -248,15 +248,28 @@ const isActive = (path: string) => {
   }
 
   function getLocation() {
-    if ("geolocation" in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        pos => fetchWeather(pos.coords.latitude, pos.coords.longitude),
-        () => fetchWeather(39.9, 116.4), // 默认北京
-        { timeout: 5000 }
-      );
-    } else {
-      fetchWeather(39.9, 116.4);
-    }
+    const weatherEl = document.querySelector<HTMLSpanElement>("#live-weather");
+    if (!weatherEl) return;
+    weatherEl.textContent = "📍";
+    weatherEl.style.cursor = "pointer";
+    weatherEl.title = "点击获取天气";
+
+    weatherEl.addEventListener("click", function requestWeather() {
+      weatherEl.style.cursor = "";
+      weatherEl.title = "";
+      weatherEl.removeEventListener("click", requestWeather);
+
+      if ("geolocation" in navigator) {
+        weatherEl.textContent = "定位中...";
+        navigator.geolocation.getCurrentPosition(
+          pos => fetchWeather(pos.coords.latitude, pos.coords.longitude),
+          () => { fetchWeather(39.9, 116.4); },
+          { timeout: 5000 }
+        );
+      } else {
+        fetchWeather(39.9, 116.4);
+      }
+    });
   }
   getLocation();
 
