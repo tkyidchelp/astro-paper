@@ -197,15 +197,21 @@ const isActive = (path: string) => {
 
   toggleNav();
 
-  const clock = document.querySelector<HTMLSpanElement>("#live-clock");
-  if (clock) {
+  let clockTimer: ReturnType<typeof setInterval> | undefined;
+  function initClock() {
+    const clock = document.querySelector<HTMLSpanElement>("#live-clock");
+    if (!clock) return;
+    if (clockTimer) clearInterval(clockTimer);
     const tick = () => {
-      const now = new Date();
-      clock.textContent = now.toLocaleTimeString("zh-CN", { hour12: false });
+      clock.textContent = new Date().toLocaleTimeString("zh-CN", { hour12: false });
     };
     tick();
-    setInterval(tick, 1000);
+    clockTimer = setInterval(tick, 1000);
   }
+  initClock();
 
-  document.addEventListener("astro:after-swap", toggleNav);
+  document.addEventListener("astro:after-swap", () => {
+    toggleNav();
+    initClock();
+  });
 </script>
