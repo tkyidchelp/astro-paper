@@ -1,0 +1,127 @@
+---
+import Layout from "@/layouts/Layout.astro";
+import Header from "@/components/Header.astro";
+import Footer from "@/components/Footer.astro";
+import Breadcrumb from "@/components/Breadcrumb.astro";
+import Main from "@/components/Main.astro";
+import config from "@/config";
+
+const pageTitle = "IP 纯度测试";
+---
+
+<Layout title={`${pageTitle} | ${config.site.title}`}>
+  <Header />
+  <Breadcrumb />
+  <Main pageTitle={pageTitle} class="app-prose">
+    <p class="text-muted mb-6 text-sm">
+      检测 IP 地址的纯净度，包括归属地、ISP、是否被标记为代理/VPN/数据中心等。
+    </p>
+
+    <div id="ip-check-app" class="space-y-4">
+      <div class="flex gap-2">
+        <input
+          id="ip-input"
+          type="text"
+          placeholder="输入 IP 地址查询，留空检测当前 IP"
+          class="border-border bg-background flex-1 rounded-md border px-3 py-2 text-sm outline-none focus:border-accent"
+        />
+        <button
+          id="ip-btn"
+          class="bg-accent text-background rounded-md px-4 py-2 text-sm font-medium hover:opacity-80 transition-opacity"
+        >
+          检测
+        </button>
+      </div>
+
+      <div id="ip-result" class="text-muted text-sm" />
+    </div>
+  </Main>
+  <Footer />
+</Layout>
+
+<script>
+  function initIpCheck() {
+    const input = document.getElementById("ip-input") as HTMLInputElement;
+    const btn = document.getElementById("ip-btn");
+    const result = document.getElementById("ip-result");
+    if (!input || !btn || !result) return;
+
+    btn.addEventListener("click", () => runCheck());
+
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") runCheck();
+    });
+
+    async function runCheck() {
+      const ip = input.value.trim();
+      result.innerHTML = '<div class="flex items-center gap-2"><div class="size-4 animate-spin rounded-full border-2 border-accent border-t-transparent"/>查询中...</div>';
+
+      try {
+        const url = ip
+          ? `http://ip-api.com/json/${ip}?lang=zh-CN&fields=66846719`
+          : "http://ip-api.com/json/?lang=zh-CN&fields=66846719";
+
+        const res = await fetch(url);
+        const data = await res.json();
+
+        if (data.status === "fail") {
+          result.innerHTML = `<p class="text-red-500">查询失败: ${data.message || "无效的 IP 地址"}</p>`;
+          return;
+        }
+
+        const purity = judgePurity(data);
+        result.innerHTML = buildTable(data, purity);
+      } catch {
+        result.innerHTML = '<p class="text-red-500">网络请求失败，请稍后重试</p>';
+      }
+    }
+
+    function judgePurity(d: any) {
+      let score = 100;
+      const warnings: string[] = [];
+      if (d.proxy || d.hosting) { score -= 40; warnings.push("代理/托管"); }
+      if (d.mobile) { score += 5; }
+      if (["hosting", "business"].includes(d.usageType)) { score -= 20; warnings.push("数据中心"); }
+      if (d.isp?.includes("Cloudflare") || d.org?.includes("Cloudflare")) { score -= 10; warnings.push("CDN 出口"); }
+      return { score: Math.max(0, score), warnings };
+    }
+
+    function buildTable(d: any, p: { score: number; warnings: string[] }) {
+      const color = p.score >= 80 ? "text-green-500" : p.score >= 50 ? "text-yellow-500" : "text-red-500";
+      const label = p.score >= 80 ? "纯净" : p.score >= 50 ? "可疑" : "高风险";
+
+      return `
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <tbody class="divide-y divide-border">
+              <tr><td class="py-2 pr-4 font-medium whitespace-nowrap">IP 地址</td><td class="py-2">${d.query}</td></tr>
+              <tr><td class="py-2 pr-4 font-medium whitespace-nowrap">国家/地区</td><td class="py-2">${d.country} ${d.regionName} ${d.city}</td></tr>
+              <tr><td class="py-2 pr-4 font-medium whitespace-nowrap">ISP</td><td class="py-2">${d.isp}</td></tr>
+              <tr><td class="py-2 pr-4 font-medium whitespace-nowrap">组织</td><td class="py-2">${d.org || "--"}</td></tr>
+              <tr><td class="py-2 pr-4 font-medium whitespace-nowrap">AS 号</td><td class="py-2">${d.as}</td></tr>
+              <tr><td class="py-2 pr-4 font-medium whitespace-nowrap">经纬度</td><td class="py-2">${d.lat}, ${d.lon}</td></tr>
+              <tr><td class="py-2 pr-4 font-medium whitespace-nowrap">时区</td><td class="py-2">${d.timezone}</td></tr>
+              <tr><td class="py-2 pr-4 font-medium whitespace-nowrap">代理/VPN</td><td class="py-2">${d.proxy ? "是 ⚠️" : "否"}</td></tr>
+              <tr><td class="py-2 pr-4 font-medium whitespace-nowrap">移动网络</td><td class="py-2">${d.mobile ? "是" : "否"}</td></tr>
+              <tr><td class="py-2 pr-4 font-medium whitespace-nowrap">托管/机房</td><td class="py-2">${d.hosting ? "是 ⚠️" : "否"}</td></tr>
+              <tr class="bg-muted/50">
+                <td class="py-3 pr-4 font-bold whitespace-nowrap">纯净度评分</td>
+                <td class="py-3">
+                  <span class="${color} text-lg font-bold">${p.score} 分</span>
+                  <span class="ml-2 px-2 py-0.5 rounded ${color} bg-current/10 text-xs font-medium">${label}</span>
+                  ${p.warnings.length ? `<span class="ml-2 text-xs text-muted">(${p.warnings.join(", ")})</span>` : ""}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    // Auto-detect on load
+    runCheck();
+  }
+
+  initIpCheck();
+  document.addEventListener("astro:after-swap", initIpCheck);
+</script>

@@ -122,6 +122,14 @@ const isActive = (path: string) => {
             </li>
           )
         }
+        <li class="col-span-2">
+          <a
+            href={getRelativeLocaleUrl(locale, "ip-check")}
+            class:list={{ "active-nav": isActive("/ip-check") }}
+          >
+            IP 检测
+          </a>
+        </li>
         {
           features.search !== false && (
             <li class="col-span-1 flex items-center justify-center">
