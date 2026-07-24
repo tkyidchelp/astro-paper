@@ -1,0 +1,61 @@
+---
+const { slug } = Astro.props;
+---
+
+<span
+  id={slug ? `like-btn-${slug}` : "like-btn"}
+  class="like-btn inline-flex cursor-pointer items-center gap-1 text-muted hover:text-red-500 transition-colors select-none"
+  data-slug={slug || ""}
+>
+  <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+  </svg>
+  <span id={slug ? `like-count-${slug}` : "like-count"} class="text-sm font-medium">0</span>
+</span>
+
+<script is:inline>
+  function initLikes() {
+    var btns = document.querySelectorAll(".like-btn");
+    for (var i = 0; i < btns.length; i++) {
+      (function(btn) {
+        var slug = btn.getAttribute("data-slug") || "global";
+        var key = "blog-likes-" + slug;
+        var count = parseInt(localStorage.getItem(key) || "0", 10) || 0;
+        var liked = localStorage.getItem(key + "-liked") === "1";
+        var icon = btn.querySelector("svg");
+        var countEl = btn.querySelector("span");
+
+        function updateUI() {
+          countEl.textContent = String(count);
+          if (liked) {
+            icon.setAttribute("fill", "currentColor");
+            icon.classList.add("text-red-500");
+            btn.classList.add("text-red-500");
+          } else {
+            icon.setAttribute("fill", "none");
+            icon.classList.remove("text-red-500");
+            btn.classList.remove("text-red-500");
+          }
+        }
+
+        updateUI();
+
+        btn.addEventListener("click", function() {
+          if (liked) {
+            liked = false;
+            count = Math.max(0, count - 1);
+          } else {
+            liked = true;
+            count++;
+          }
+          localStorage.setItem(key, String(count));
+          localStorage.setItem(key + "-liked", liked ? "1" : "0");
+          updateUI();
+        });
+      })(btns[i]);
+    }
+  }
+
+  initLikes();
+  document.addEventListener("astro:after-swap", initLikes);
+</script>
