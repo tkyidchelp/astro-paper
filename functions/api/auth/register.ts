@@ -28,7 +28,7 @@ export async function onRequestPost(context: { request: Request; env: { BLOG_KV:
 
     const token = await createToken(username, hashHex);
 
-    return Response.json({ success: true, token, username });
+    return Response.json({ success: true, token, username, createdAt: Date.now() });
   } catch (e) {
     return Response.json({ error: "服务器错误" }, { status: 500 });
   }

@@ -52,6 +52,7 @@ function initReg() {
         if (d.error) { msg.textContent = d.error; msg.className = "text-sm text-center text-red-500"; return; }
         localStorage.setItem("blog-token", d.token);
         localStorage.setItem("blog-user", d.username);
+        if (d.createdAt) localStorage.setItem("blog-created", d.createdAt);
         msg.textContent = "注册成功";
         msg.className = "text-sm text-center text-green-500";
         setTimeout(function() { window.location.href = "/"; }, 500);

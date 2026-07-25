@@ -54,7 +54,7 @@ export async function onRequestPost(context: { request: Request; env: Env }) {
     const sigHex = Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2, "0")).join("");
     const token = btoa(payload) + "." + sigHex;
 
-    return Response.json({ success: true, token, username });
+    return Response.json({ success: true, token, username, createdAt: user.createdAt || null });
   } catch (e) {
     return Response.json({ error: "服务器错误" }, { status: 500 });
   }

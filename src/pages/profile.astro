@@ -61,6 +61,7 @@ function initProfile() {
 
   var token = localStorage.getItem("blog-token");
   var username = localStorage.getItem("blog-user");
+  var createdAt = localStorage.getItem("blog-created");
 
   if (!token || !username) {
     loading.classList.add("hidden");
@@ -68,41 +69,23 @@ function initProfile() {
     return;
   }
 
-  fetch("/api/auth/profile", {
-    method: "GET",
-    headers: { "Authorization": "Bearer " + token }
-  })
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-      loading.classList.add("hidden");
-      if (data.error || !data.username) {
-        error.classList.remove("hidden");
-        return;
-      }
-      
-      usernameEl.textContent = data.username;
-      
-      if (data.createdAt) {
-        var date = new Date(data.createdAt);
-        createdEl.textContent = date.toLocaleString("zh-CN", {
-          year: "numeric",
-          month: "2-digit",
-          day: "2-digit",
-          hour: "2-digit",
-          minute: "2-digit"
-        });
-      }
-
-      content.classList.remove("hidden");
-    })
-    .catch(function() {
-      loading.classList.add("hidden");
-      error.classList.remove("hidden");
+  loading.classList.add("hidden");
+  usernameEl.textContent = username;
+  if (createdAt) {
+    var date = new Date(parseInt(createdAt));
+    createdEl.textContent = date.toLocaleString("zh-CN", {
+      year: "numeric", month: "2-digit", day: "2-digit",
+      hour: "2-digit", minute: "2-digit"
     });
+  } else {
+    createdEl.textContent = "--";
+  }
+  content.classList.remove("hidden");
 
   logoutBtn.addEventListener("click", function() {
     localStorage.removeItem("blog-token");
     localStorage.removeItem("blog-user");
+    localStorage.removeItem("blog-created");
     window.location.href = "/login/";
   });
 }
