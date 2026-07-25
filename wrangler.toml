@@ -4,4 +4,4 @@ pages_build_output_dir = "dist"
 
 [[kv_namespaces]]
 binding = "BLOG_KV"
-id = "YOUR_KV_NAMESPACE_ID"
+id = "43138b8855894064ac51c25e6cbc638f"
