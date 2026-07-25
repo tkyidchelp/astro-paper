@@ -1,8 +1,4 @@
-interface Env {
-  BLOG_KV: KVNamespace;
-}
-
-export async function onRequestPost(context: { request: Request; env: Env }) {
+export async function onRequestPost(context: { request: Request; env: { BLOG_KV: KVNamespace } }) {
   const { request, env } = context;
   try {
     const { username, password } = await request.json() as { username: string; password: string };
