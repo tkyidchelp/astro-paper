@@ -1,0 +1,71 @@
+<div
+  id="news-widget"
+  class="border-border mt-8 rounded-lg border"
+>
+  <div class="flex items-center justify-between border-b px-4 py-3">
+    <h2 class="text-sm font-bold">实时热点</h2>
+    <span id="news-time" class="text-muted text-xs">--:--</span>
+  </div>
+  <div id="news-list" class="divide-y divide-border px-4 py-2">
+    <p class="text-muted text-sm">加载中...</p>
+  </div>
+  <div class="border-t px-4 py-2 text-right">
+    <span class="text-muted text-xs">数据来源：聚合热榜</span>
+  </div>
+</div>
+
+<script is:inline>
+function initNews() {
+  var list = document.getElementById("news-list");
+  var timeEl = document.getElementById("news-time");
+  if (!list || !timeEl) return;
+
+  var LSK = "blog-news-cache";
+  var cached = localStorage.getItem(LSK);
+
+  if (cached) {
+    try {
+      var obj = JSON.parse(cached);
+      if (obj.time && obj.data && Date.now() - obj.time < 30 * 60 * 1000) {
+        render(obj.data);
+        updateTime(obj.time);
+        return;
+      }
+    } catch(e) {}
+  }
+
+  fetch("https://api.vvhan.com/api/hotlist")
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.success && data.data) {
+        var items = data.data.slice(0, 10);
+        localStorage.setItem(LSK, JSON.stringify({ time: Date.now(), data: items }));
+        render(items);
+        updateTime(Date.now());
+      }
+    })
+    .catch(function() {
+      list.innerHTML = '<p class="text-muted text-sm">获取失败，请刷新重试</p>';
+    });
+
+  function render(items) {
+    var html = "";
+    for (var i = 0; i < items.length; i++) {
+      var item = items[i];
+      html += '<a href="' + (item.url || "#") + '" target="_blank" rel="noopener" class="flex items-start gap-2 py-2 hover:text-accent transition-colors">' +
+        '<span class="text-accent font-bold text-xs mt-0.5 min-w-[20px]">' + (item.index || (i + 1)) + '</span>' +
+        '<span class="text-sm flex-1 leading-snug truncate">' + (item.title || item.desc || "无标题") + '</span>' +
+        '</a>';
+    }
+    list.innerHTML = html;
+  }
+
+  function updateTime(ts) {
+    var d = new Date(ts);
+    timeEl.textContent = d.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" });
+  }
+}
+
+initNews();
+document.addEventListener("astro:after-swap", initNews);
+</script>
