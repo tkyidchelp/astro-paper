@@ -1,0 +1,6 @@
+name = "astro-paper"
+compatibility_date = "2025-01-01"
+
+[[kv_namespaces]]
+binding = "BLOG_KV"
+id = "YOUR_KV_NAMESPACE_ID"

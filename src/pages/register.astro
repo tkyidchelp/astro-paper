@@ -1,0 +1,63 @@
+---
+import Layout from "@/layouts/Layout.astro";
+import Header from "@/components/Header.astro";
+import Footer from "@/components/Footer.astro";
+import Breadcrumb from "@/components/Breadcrumb.astro";
+import Main from "@/components/Main.astro";
+import config from "@/config";
+---
+
+<Layout title={`注册 | ${config.site.title}`}>
+  <Header />
+  <Breadcrumb />
+  <Main pageTitle="注册" class="app-prose">
+    <div class="mx-auto max-w-sm space-y-4">
+      <input id="reg-name" type="text" placeholder="用户名（2-20位）" class="border-border bg-background w-full rounded-md border px-3 py-2 text-sm outline-none focus:border-accent" />
+      <input id="reg-pass" type="password" placeholder="密码（至少6位）" class="border-border bg-background w-full rounded-md border px-3 py-2 text-sm outline-none focus:border-accent" />
+      <input id="reg-pass2" type="password" placeholder="确认密码" class="border-border bg-background w-full rounded-md border px-3 py-2 text-sm outline-none focus:border-accent" />
+      <button id="reg-btn" class="bg-accent text-background w-full rounded-md px-4 py-2 text-sm font-medium hover:opacity-80">注册</button>
+      <p id="reg-msg" class="text-sm text-center"></p>
+      <p class="text-muted text-sm text-center">已有账号？<a href="/login/" class="text-accent underline">登录</a></p>
+    </div>
+  </Main>
+  <Footer />
+</Layout>
+
+<script is:inline>
+function initReg() {
+  var btn = document.getElementById("reg-btn");
+  var msg = document.getElementById("reg-msg");
+  if (!btn || !msg) return;
+
+  btn.addEventListener("click", function() {
+    var name = document.getElementById("reg-name").value.trim();
+    var pass = document.getElementById("reg-pass").value;
+    var pass2 = document.getElementById("reg-pass2").value;
+
+    if (!name || !pass) { msg.textContent = "请填写所有字段"; msg.className = "text-sm text-center text-red-500"; return; }
+    if (name.length < 2 || name.length > 20) { msg.textContent = "用户名需 2-20 个字符"; msg.className = "text-sm text-center text-red-500"; return; }
+    if (pass.length < 6) { msg.textContent = "密码至少 6 位"; msg.className = "text-sm text-center text-red-500"; return; }
+    if (pass !== pass2) { msg.textContent = "两次密码不一致"; msg.className = "text-sm text-center text-red-500"; return; }
+
+    msg.textContent = "注册中...";
+    msg.className = "text-sm text-center text-muted";
+
+    fetch("/api/auth/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username: name, password: pass })
+    })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        if (d.error) { msg.textContent = d.error; msg.className = "text-sm text-center text-red-500"; return; }
+        localStorage.setItem("blog-token", d.token);
+        localStorage.setItem("blog-user", d.username);
+        msg.textContent = "注册成功";
+        msg.className = "text-sm text-center text-green-500";
+        setTimeout(function() { window.location.href = "/"; }, 500);
+      })
+      .catch(function() { msg.textContent = "网络错误"; msg.className = "text-sm text-center text-red-500"; });
+  });
+}
+initReg();
+</script>

@@ -1,0 +1,57 @@
+---
+import Layout from "@/layouts/Layout.astro";
+import Header from "@/components/Header.astro";
+import Footer from "@/components/Footer.astro";
+import Breadcrumb from "@/components/Breadcrumb.astro";
+import Main from "@/components/Main.astro";
+import config from "@/config";
+---
+
+<Layout title={`登录 | ${config.site.title}`}>
+  <Header />
+  <Breadcrumb />
+  <Main pageTitle="登录" class="app-prose">
+    <div class="mx-auto max-w-sm space-y-4">
+      <input id="login-name" type="text" placeholder="用户名" class="border-border bg-background w-full rounded-md border px-3 py-2 text-sm outline-none focus:border-accent" />
+      <input id="login-pass" type="password" placeholder="密码" class="border-border bg-background w-full rounded-md border px-3 py-2 text-sm outline-none focus:border-accent" />
+      <button id="login-btn" class="bg-accent text-background w-full rounded-md px-4 py-2 text-sm font-medium hover:opacity-80">登录</button>
+      <p id="login-msg" class="text-sm text-center"></p>
+      <p class="text-muted text-sm text-center">没有账号？<a href="/register/" class="text-accent underline">注册</a></p>
+    </div>
+  </Main>
+  <Footer />
+</Layout>
+
+<script is:inline>
+function initLogin() {
+  var btn = document.getElementById("login-btn");
+  var msg = document.getElementById("login-msg");
+  if (!btn || !msg) return;
+
+  btn.addEventListener("click", function() {
+    var name = document.getElementById("login-name").value.trim();
+    var pass = document.getElementById("login-pass").value.trim();
+    if (!name || !pass) { msg.textContent = "请填写用户名和密码"; msg.className = "text-sm text-center text-red-500"; return; }
+
+    msg.textContent = "登录中...";
+    msg.className = "text-sm text-center text-muted";
+
+    fetch("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username: name, password: pass })
+    })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        if (d.error) { msg.textContent = d.error; msg.className = "text-sm text-center text-red-500"; return; }
+        localStorage.setItem("blog-token", d.token);
+        localStorage.setItem("blog-user", d.username);
+        msg.textContent = "登录成功";
+        msg.className = "text-sm text-center text-green-500";
+        setTimeout(function() { window.location.href = "/"; }, 500);
+      })
+      .catch(function() { msg.textContent = "网络错误"; msg.className = "text-sm text-center text-red-500"; });
+  });
+}
+initLogin();
+</script>
