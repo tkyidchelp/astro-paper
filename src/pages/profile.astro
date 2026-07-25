@@ -1,0 +1,111 @@
+---
+import Layout from "@/layouts/Layout.astro";
+import Header from "@/components/Header.astro";
+import Footer from "@/components/Footer.astro";
+import Breadcrumb from "@/components/Breadcrumb.astro";
+import Main from "@/components/Main.astro";
+import config from "@/config";
+---
+
+<Layout title={`个人中心 | ${config.site.title}`}>
+  <Header />
+  <Breadcrumb />
+  <Main pageTitle="个人中心" class="app-prose">
+    <div class="mx-auto max-w-2xl space-y-6">
+      <div id="profile-content" class="hidden space-y-6">
+        <div class="border-border bg-background rounded-lg border p-6 space-y-4">
+          <h2 class="text-xl font-semibold">基本信息</h2>
+          <div class="space-y-3">
+            <div class="flex items-center justify-between">
+              <span class="text-muted">用户名</span>
+              <span id="profile-username" class="font-medium">--</span>
+            </div>
+            <div class="flex items-center justify-between">
+              <span class="text-muted">注册时间</span>
+              <span id="profile-created" class="font-medium">--</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="border-border bg-background rounded-lg border p-6 space-y-4">
+          <h2 class="text-xl font-semibold">账号操作</h2>
+          <button id="logout-btn" class="bg-accent text-background w-full rounded-md px-4 py-2 text-sm font-medium hover:opacity-80">
+            退出登录
+          </button>
+        </div>
+      </div>
+
+      <div id="profile-loading" class="text-center py-12">
+        <p class="text-muted">加载中...</p>
+      </div>
+
+      <div id="profile-error" class="hidden text-center py-12">
+        <p class="text-red-500 mb-4">您尚未登录</p>
+        <a href="/login/" class="text-accent underline">前往登录</a>
+      </div>
+    </div>
+  </Main>
+  <Footer />
+</Layout>
+
+<script is:inline>
+function initProfile() {
+  var content = document.getElementById("profile-content");
+  var loading = document.getElementById("profile-loading");
+  var error = document.getElementById("profile-error");
+  var usernameEl = document.getElementById("profile-username");
+  var createdEl = document.getElementById("profile-created");
+  var logoutBtn = document.getElementById("logout-btn");
+
+  if (!content || !loading || !error || !usernameEl || !createdEl || !logoutBtn) return;
+
+  var token = localStorage.getItem("blog-token");
+  var username = localStorage.getItem("blog-user");
+
+  if (!token || !username) {
+    loading.classList.add("hidden");
+    error.classList.remove("hidden");
+    return;
+  }
+
+  fetch("/api/auth/profile", {
+    method: "GET",
+    headers: { "Authorization": "Bearer " + token }
+  })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      loading.classList.add("hidden");
+      if (data.error || !data.username) {
+        error.classList.remove("hidden");
+        return;
+      }
+      
+      usernameEl.textContent = data.username;
+      
+      if (data.createdAt) {
+        var date = new Date(data.createdAt);
+        createdEl.textContent = date.toLocaleString("zh-CN", {
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit"
+        });
+      }
+
+      content.classList.remove("hidden");
+    })
+    .catch(function() {
+      loading.classList.add("hidden");
+      error.classList.remove("hidden");
+    });
+
+  logoutBtn.addEventListener("click", function() {
+    localStorage.removeItem("blog-token");
+    localStorage.removeItem("blog-user");
+    window.location.href = "/login/";
+  });
+}
+
+initProfile();
+</script>

@@ -296,7 +296,7 @@ const isActive = (path: string) => {
     if (!el) return;
     var user = localStorage.getItem("blog-user");
     if (user) {
-      el.innerHTML = '<div class="flex items-center gap-2 text-xs"><span class="text-accent">' + user + '</span><a href="javascript:void(0)" id="logout-btn" class="text-muted hover:text-accent">退出</a></div>';
+      el.innerHTML = '<div class="flex items-center gap-2 text-xs"><a href="/profile/" class="text-accent hover:underline">' + user + '</a><a href="javascript:void(0)" id="logout-btn" class="text-muted hover:text-accent">退出</a></div>';
       document.getElementById("logout-btn")?.addEventListener("click", function() {
         localStorage.removeItem("blog-token");
         localStorage.removeItem("blog-user");
