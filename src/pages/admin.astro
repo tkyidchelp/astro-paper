@@ -1,0 +1,213 @@
+---
+import Layout from "@/layouts/Layout.astro";
+import Header from "@/components/Header.astro";
+import config from "@/config";
+---
+
+<Layout title={`后台管理 | ${config.site.title}`}>
+  <Header />
+  <main class="app-layout min-h-screen py-8">
+    <div id="admin-login" class="mx-auto max-w-sm space-y-4">
+      <h1 class="text-2xl font-bold text-center">后台管理</h1>
+      <input id="admin-pass" type="password" placeholder="管理员密码" class="border-border bg-background w-full rounded-md border px-3 py-2 text-sm outline-none focus:border-accent" />
+      <button id="admin-login-btn" class="bg-accent text-background w-full rounded-md px-4 py-2 text-sm font-medium hover:opacity-80">登录</button>
+      <p id="admin-msg" class="text-sm text-center"></p>
+    </div>
+
+    <div id="admin-panel" class="hidden mx-auto max-w-4xl">
+      <div class="flex items-center justify-between mb-6">
+        <h1 class="text-2xl font-bold">文章管理</h1>
+        <div class="flex gap-2">
+          <button id="new-post-btn" class="bg-green-600 text-white rounded-md px-4 py-2 text-sm hover:opacity-80">新建文章</button>
+          <button id="admin-logout-btn" class="border-border bg-background rounded-md border px-4 py-2 text-sm hover:opacity-80">退出</button>
+        </div>
+      </div>
+
+      <div id="post-list" class="space-y-2 mb-8">
+        <p class="text-muted text-center py-8">加载中...</p>
+      </div>
+
+      <div id="post-editor" class="hidden border-border bg-background rounded-lg border p-6 space-y-4">
+        <h2 id="editor-title-label" class="text-lg font-semibold">新建文章</h2>
+        <input id="edit-title" type="text" placeholder="文章标题" class="border-border bg-background w-full rounded-md border px-3 py-2 text-sm outline-none focus:border-accent" />
+        <div class="flex gap-2">
+          <input id="edit-slug" type="text" placeholder="URL 标识 (英文)" class="border-border bg-background flex-1 rounded-md border px-3 py-2 text-sm outline-none focus:border-accent" />
+          <input id="edit-date" type="datetime-local" class="border-border bg-background rounded-md border px-3 py-2 text-sm outline-none focus:border-accent" />
+        </div>
+        <input id="edit-desc" type="text" placeholder="文章描述" class="border-border bg-background w-full rounded-md border px-3 py-2 text-sm outline-none focus:border-accent" />
+        <input id="edit-tags" type="text" placeholder="标签 (逗号分隔)" class="border-border bg-background w-full rounded-md border px-3 py-2 text-sm outline-none focus:border-accent" />
+        <label class="flex items-center gap-2 text-sm">
+          <input id="edit-featured" type="checkbox" class="size-4 accent-accent" /> 精选文章
+        </label>
+        <textarea id="edit-content" rows="20" placeholder="Markdown 内容" class="border-border bg-background w-full rounded-md border px-3 py-2 text-sm font-mono outline-none focus:border-accent"></textarea>
+        <div class="flex gap-2">
+          <button id="save-post-btn" class="bg-accent text-background rounded-md px-4 py-2 text-sm font-medium hover:opacity-80">保存</button>
+          <button id="cancel-edit-btn" class="border-border bg-background rounded-md border px-4 py-2 text-sm hover:opacity-80">取消</button>
+          <button id="delete-post-btn" class="ml-auto bg-red-600 text-white rounded-md px-4 py-2 text-sm hover:opacity-80 hidden">删除</button>
+        </div>
+        <p id="edit-msg" class="text-sm"></p>
+      </div>
+    </div>
+  </main>
+</Layout>
+
+<script is:inline>
+var adminToken = localStorage.getItem("admin-token");
+var loginEl = document.getElementById("admin-login");
+var panelEl = document.getElementById("admin-panel");
+var msgEl = document.getElementById("admin-msg");
+
+function api(path, options) {
+  return fetch("/api/admin/" + path, {
+    ...options,
+    headers: { ...options?.headers, "Authorization": "Bearer " + adminToken, "Content-Type": "application/json" }
+  });
+}
+
+function showLogin() { loginEl?.classList.remove("hidden"); panelEl?.classList.add("hidden"); }
+function showPanel() { loginEl?.classList.add("hidden"); panelEl?.classList.remove("hidden"); }
+
+async function checkAuth() {
+  try {
+    var r = await api("auth");
+    var d = await r.json();
+    if (d.valid) { showPanel(); loadPosts(); } else { showLogin(); }
+  } catch { showLogin(); }
+}
+
+document.getElementById("admin-login-btn")?.addEventListener("click", async function() {
+  var passEl = document.getElementById("admin-pass");
+  var pass = passEl ? passEl.value : "";
+  if (!pass) { if (msgEl) { msgEl.textContent = "请输入密码"; msgEl.className = "text-sm text-center text-red-500"; } return; }
+  try {
+    var r = await fetch("/api/admin/auth", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ password: pass }) });
+    var d = await r.json();
+    if (d.error) { if (msgEl) { msgEl.textContent = d.error; msgEl.className = "text-sm text-center text-red-500"; } return; }
+    adminToken = d.token;
+    localStorage.setItem("admin-token", adminToken);
+    showPanel();
+    loadPosts();
+  } catch { if (msgEl) { msgEl.textContent = "网络错误"; msgEl.className = "text-sm text-center text-red-500"; } }
+});
+
+document.getElementById("admin-logout-btn")?.addEventListener("click", function() {
+  localStorage.removeItem("admin-token");
+  adminToken = "";
+  showLogin();
+});
+
+async function loadPosts() {
+  var list = document.getElementById("post-list");
+  if (!list) return;
+  try {
+    var r = await api("posts");
+    var posts = await r.json();
+    if (posts.error) { list.innerHTML = '<p class="text-red-500">加载失败</p>'; return; }
+    if (posts.length === 0) { list.innerHTML = '<p class="text-muted text-center py-8">暂无文章</p>'; return; }
+    list.innerHTML = posts.map(function(p) {
+      return '<div class="border-border bg-background flex items-center justify-between rounded-lg border px-4 py-3">' +
+        '<div><a href="/posts/' + p.slug + '/" class="font-medium hover:text-accent">' + p.title + '</a><span class="text-muted text-xs ml-2">' + (p.pubDatetime ? new Date(p.pubDatetime).toLocaleDateString("zh-CN") : "") + '</span></div>' +
+        '<div class="flex gap-2"><button data-slug="' + p.slug + '" class="edit-btn text-blue-500 text-sm hover:underline">编辑</button></div>' +
+        '</div>';
+    }).join("");
+    list.querySelectorAll(".edit-btn").forEach(function(btn) {
+      btn.addEventListener("click", function() { editPost(btn.dataset.slug || ""); });
+    });
+  } catch { list.innerHTML = '<p class="text-red-500">加载失败</p>'; }
+}
+
+var editingSlug = "";
+var editorEl = document.getElementById("post-editor");
+
+function hideEditor() {
+  editingSlug = "";
+  editorEl?.classList.add("hidden");
+  document.getElementById("delete-post-btn")?.classList.add("hidden");
+  var titleLabel = document.getElementById("editor-title-label");
+  if (titleLabel) titleLabel.textContent = "新建文章";
+  var et = document.getElementById("edit-title"); if (et) et.value = "";
+  var es = document.getElementById("edit-slug"); if (es) { es.value = ""; es.disabled = false; }
+  var ed = document.getElementById("edit-desc"); if (ed) ed.value = "";
+  var eg = document.getElementById("edit-tags"); if (eg) eg.value = "";
+  var ec = document.getElementById("edit-content"); if (ec) ec.value = "";
+  var edn = document.getElementById("edit-date"); if (edn) edn.value = "";
+  var ef = document.getElementById("edit-featured"); if (ef) ef.checked = false;
+  var m = document.getElementById("edit-msg"); if (m) m.textContent = "";
+}
+
+document.getElementById("new-post-btn")?.addEventListener("click", function() {
+  hideEditor();
+  editorEl?.classList.remove("hidden");
+});
+
+document.getElementById("cancel-edit-btn")?.addEventListener("click", hideEditor);
+
+async function editPost(slug) {
+  try {
+    var r = await api("posts?slug=" + slug);
+    var post = await r.json();
+    if (post.error) return;
+    editingSlug = slug;
+    editorEl?.classList.remove("hidden");
+    var tl = document.getElementById("editor-title-label");
+    if (tl) tl.textContent = "编辑文章";
+    var et = document.getElementById("edit-title"); if (et) et.value = post.title || "";
+    var es = document.getElementById("edit-slug"); if (es) { es.value = post.slug; es.disabled = true; }
+    var ed = document.getElementById("edit-desc"); if (ed) ed.value = post.description || "";
+    var eg = document.getElementById("edit-tags"); if (eg) eg.value = (post.tags || []).join(", ");
+    var ec = document.getElementById("edit-content"); if (ec) ec.value = post.content || "";
+    var ef = document.getElementById("edit-featured"); if (ef) ef.checked = post.featured || false;
+    if (post.pubDatetime) {
+      var edn = document.getElementById("edit-date"); if (edn) edn.value = new Date(post.pubDatetime).toISOString().slice(0, 16);
+    }
+    document.getElementById("delete-post-btn")?.classList.remove("hidden");
+  } catch {}
+}
+
+document.getElementById("save-post-btn")?.addEventListener("click", async function() {
+  var m = document.getElementById("edit-msg");
+  var titleEl = document.getElementById("edit-title");
+  var slugEl = document.getElementById("edit-slug");
+  var descEl = document.getElementById("edit-desc");
+  var tagsEl = document.getElementById("edit-tags");
+  var contentEl = document.getElementById("edit-content");
+  var dateEl = document.getElementById("edit-date");
+  var featuredEl = document.getElementById("edit-featured");
+
+  var title = titleEl?.value?.trim() || "";
+  var slug = (slugEl?.value || "").trim().toLowerCase().replace(/\s+/g, "-");
+  var desc = descEl?.value?.trim() || "";
+  var tags = (tagsEl?.value || "").split(",").map(function(t) { return t.trim(); }).filter(Boolean);
+  var content = contentEl?.value || "";
+  var date = dateEl?.value || "";
+  var featured = featuredEl?.checked || false;
+
+  if (!title || !slug || !content) { if (m) { m.textContent = "标题、slug 和内容不能为空"; m.className = "text-sm text-red-500"; } return; }
+
+  try {
+    var r = await api("posts", {
+      method: "POST",
+      body: JSON.stringify({ title, slug, description: desc, tags, content, pubDatetime: date ? new Date(date).toISOString() : undefined, featured, author: "杨宏轩", action: editingSlug ? "update" : "create" })
+    });
+    var d = await r.json();
+    if (d.error) { if (m) { m.textContent = d.error; m.className = "text-sm text-red-500"; } return; }
+    if (m) { m.textContent = "保存成功"; m.className = "text-sm text-green-500"; }
+    hideEditor();
+    loadPosts();
+  } catch { if (m) { m.textContent = "网络错误"; m.className = "text-sm text-red-500"; } }
+});
+
+document.getElementById("delete-post-btn")?.addEventListener("click", async function() {
+  if (!confirm("确认删除？")) return;
+  var m = document.getElementById("edit-msg");
+  try {
+    var r = await api("posts?slug=" + editingSlug, { method: "DELETE" });
+    var d = await r.json();
+    if (d.error) { if (m) { m.textContent = d.error; m.className = "text-sm text-red-500"; } return; }
+    hideEditor();
+    loadPosts();
+  } catch { if (m) { m.textContent = "网络错误"; m.className = "text-sm text-red-500"; } }
+});
+
+if (adminToken) checkAuth(); else showLogin();
+</script>
