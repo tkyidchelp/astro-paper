@@ -21,7 +21,8 @@ async function checkAdmin(request: Request, env: Env): Promise<boolean> {
     const [payloadB64, sigHex] = token.split(".");
     const payload = JSON.parse(atob(payloadB64));
     if (payload.exp < Date.now()) return false;
-    const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(env.ADMIN_PASSWORD), { name: "HMAC", hash: "SHA-256" }, false, ["verify"]);
+    const pwd = env.ADMIN_PASSWORD || "admin123";
+    const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(pwd), { name: "HMAC", hash: "SHA-256" }, false, ["verify"]);
     const sigBytes = new Uint8Array(sigHex.match(/.{2}/g)!.map(b => parseInt(b, 16)));
     return await crypto.subtle.verify("HMAC", key, sigBytes, new TextEncoder().encode(payloadB64));
   } catch {
