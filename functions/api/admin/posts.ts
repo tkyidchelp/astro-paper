@@ -32,31 +32,30 @@ async function checkAdmin(request: Request, env: Env): Promise<boolean> {
 
 export async function onRequestGet(context: { request: Request; env: Env }) {
   const { request, env } = context;
-  if (!await checkAdmin(request, env)) {
-    return Response.json({ error: "未授权" }, { status: 401 });
-  }
-
   const url = new URL(request.url);
   const slug = url.searchParams.get("slug");
 
-  if (slug) {
-    const raw = await env.BLOG_KV.get("admin:post:" + slug);
-    if (!raw) return Response.json({ error: "未找到" }, { status: 404 });
-    return Response.json(JSON.parse(raw));
+  if (!slug) {
+    if (!await checkAdmin(request, env)) {
+      return Response.json({ error: "未授权" }, { status: 401 });
+    }
+    const indexRaw = await env.BLOG_KV.get("admin:posts");
+    const slugs: string[] = indexRaw ? JSON.parse(indexRaw) : [];
+    const posts: Partial<Post>[] = [];
+    for (const s of slugs) {
+      const raw = await env.BLOG_KV.get("admin:post:" + s);
+      if (raw) {
+        const post = JSON.parse(raw) as Post;
+        posts.push({ slug: post.slug, title: post.title, description: post.description, pubDatetime: post.pubDatetime, tags: post.tags, featured: post.featured });
+      }
+    }
+    posts.sort((a, b) => new Date(b.pubDatetime!).getTime() - new Date(a.pubDatetime!).getTime());
+    return Response.json(posts);
   }
 
-  const indexRaw = await env.BLOG_KV.get("admin:posts");
-  const slugs: string[] = indexRaw ? JSON.parse(indexRaw) : [];
-  const posts: Partial<Post>[] = [];
-  for (const s of slugs) {
-    const raw = await env.BLOG_KV.get("admin:post:" + s);
-    if (raw) {
-      const post = JSON.parse(raw) as Post;
-      posts.push({ slug: post.slug, title: post.title, description: post.description, pubDatetime: post.pubDatetime, tags: post.tags, featured: post.featured });
-    }
-  }
-  posts.sort((a, b) => new Date(b.pubDatetime!).getTime() - new Date(a.pubDatetime!).getTime());
-  return Response.json(posts);
+  const raw = await env.BLOG_KV.get("admin:post:" + slug);
+  if (!raw) return Response.json({ error: "未找到" }, { status: 404 });
+  return Response.json(JSON.parse(raw));
 }
 
 export async function onRequestPost(context: { request: Request; env: Env }) {

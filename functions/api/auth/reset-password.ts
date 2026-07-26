@@ -1,14 +1,33 @@
 interface Env {
   BLOG_KV: KVNamespace;
   RESEND_KEY: string;
+  TURNSTILE_SECRET: string;
+}
+
+async function verifyTurnstile(token: string | undefined, secret: string): Promise<boolean> {
+  if (!token) return false;
+  try {
+    const res = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: `secret=${encodeURIComponent(secret)}&response=${encodeURIComponent(token)}`
+    });
+    const data = await res.json() as { success: boolean };
+    return data.success;
+  } catch {
+    return false;
+  }
 }
 
 export async function onRequestPost(context: { request: Request; env: Env }) {
   const { request, env } = context;
   try {
-    const { email, code, newPassword } = await request.json() as { email?: string; code?: string; newPassword?: string };
+    const { email, code, newPassword, turnstile } = await request.json() as { email?: string; code?: string; newPassword?: string; turnstile?: string };
 
     if (email && !code) {
+      if (!await verifyTurnstile(turnstile, env.TURNSTILE_SECRET)) {
+        return Response.json({ error: "人机验证失败" }, { status: 400 });
+      }
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
         return Response.json({ error: "请输入有效的邮箱地址" }, { status: 400 });
       }

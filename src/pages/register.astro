@@ -21,6 +21,7 @@ import config from "@/config";
         <button id="send-code-btn" class="bg-accent text-background shrink-0 rounded-md px-3 py-2 text-xs font-medium hover:opacity-80 whitespace-nowrap">发送验证码</button>
       </div>
       <button id="reg-btn" class="bg-accent text-background w-full rounded-md px-4 py-2 text-sm font-medium hover:opacity-80">注册</button>
+      <div class="cf-turnstile" data-sitekey="0x4AAAAAAD97tzDDAk6cBcmK" data-theme="auto"></div>
       <p id="reg-msg" class="text-sm text-center"></p>
       <p class="text-muted text-sm text-center">已有账号？<a href="/login/" class="text-accent underline">登录</a></p>
     </div>
@@ -109,13 +110,18 @@ function initReg() {
       return;
     }
 
+    var tsEl = document.querySelector('[name="cf-turnstile-response"]');
+    var tsToken = tsEl ? tsEl.value : "";
+
+    if (!tsToken) { msg.textContent = "请完成人机验证"; msg.className = "text-sm text-center text-red-500"; return; }
+
     msg.textContent = "注册中...";
     msg.className = "text-sm text-center text-muted";
 
     fetch("/api/auth/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username: name, password: pass, email: email, code: code })
+      body: JSON.stringify({ username: name, password: pass, email: email, code: code, turnstile: tsToken })
     })
       .then(function(r) { return r.json(); })
       .then(function(d) {
@@ -132,3 +138,5 @@ function initReg() {
 }
 initReg();
 </script>
+
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>

@@ -106,6 +106,11 @@ const homePath = getRelativeLocaleUrl(locale, "");
       )
     }
 
+    <div id="admin-posts-section" class="pt-12 pb-6 hidden">
+      <h2 class="text-2xl font-semibold tracking-wide">动态文章</h2>
+      <ul id="admin-posts-list"></ul>
+    </div>
+
     <div class="my-8 text-center">
       <LinkButton href={getRelativeLocaleUrl(locale, "posts")}>
         {t.home.allPosts}
@@ -125,4 +130,22 @@ const homePath = getRelativeLocaleUrl(locale, "");
       sessionStorage.setItem("backUrl", indexLayout.homePath ?? baseRoot);
     }
   });
+</script>
+
+<script is:inline>
+  fetch("/api/admin/posts")
+    .then(function(r) { return r.json(); })
+    .then(function(posts) {
+      if (!posts || posts.length === 0) return;
+      var section = document.getElementById("admin-posts-section");
+      var list = document.getElementById("admin-posts-list");
+      if (!section || !list) return;
+      posts.forEach(function(p) {
+        var li = document.createElement("li");
+        li.innerHTML = '<a href="/post-view/?slug=' + p.slug + '" class="font-medium hover:text-accent">' + p.title + '</a>';
+        list.appendChild(li);
+      });
+      section.classList.remove("hidden");
+    })
+    .catch(function() { });
 </script>

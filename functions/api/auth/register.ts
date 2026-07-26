@@ -1,5 +1,21 @@
 interface Env {
   BLOG_KV: KVNamespace;
+  TURNSTILE_SECRET: string;
+}
+
+async function verifyTurnstile(token: string | undefined, secret: string, env: Env): Promise<boolean> {
+  if (!token) return false;
+  try {
+    const res = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: `secret=${encodeURIComponent(secret)}&response=${encodeURIComponent(token)}`
+    });
+    const data = await res.json() as { success: boolean };
+    return data.success;
+  } catch {
+    return false;
+  }
 }
 
 function verifyCode(code: string, storedRaw: string | null): string | null {
@@ -14,10 +30,14 @@ function verifyCode(code: string, storedRaw: string | null): string | null {
 export async function onRequestPost(context: { request: Request; env: Env }) {
   const { request, env } = context;
   try {
-    const { username, password, email, code } = await request.json() as { username: string; password: string; email: string; code: string };
+    const { username, password, email, code, turnstile } = await request.json() as { username: string; password: string; email: string; code: string; turnstile?: string };
 
     if (!username || !password || !email || !code) {
       return Response.json({ error: "请填写所有字段" }, { status: 400 });
+    }
+
+    if (!(await verifyTurnstile(turnstile, env.TURNSTILE_SECRET, env))) {
+      return Response.json({ error: "人机验证失败" }, { status: 400 });
     }
     if (username.length < 2 || username.length > 20) {
       return Response.json({ error: "用户名长度 2-20 个字符" }, { status: 400 });
