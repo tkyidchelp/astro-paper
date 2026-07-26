@@ -36,9 +36,6 @@ export async function onRequestGet(context: { request: Request; env: Env }) {
   const slug = url.searchParams.get("slug");
 
   if (!slug) {
-    if (!await checkAdmin(request, env)) {
-      return Response.json({ error: "未授权" }, { status: 401 });
-    }
     const indexRaw = await env.BLOG_KV.get("admin:posts");
     const slugs: string[] = indexRaw ? JSON.parse(indexRaw) : [];
     const posts: Partial<Post>[] = [];
