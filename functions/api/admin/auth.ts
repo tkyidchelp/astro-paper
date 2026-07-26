@@ -12,11 +12,12 @@ export async function onRequestPost(context: { request: Request; env: Env }) {
       return Response.json({ error: "密码错误" }, { status: 401 });
     }
     const encoder = new TextEncoder();
-    const key = await crypto.subtle.importKey("raw", encoder.encode(pwd), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
     const payload = JSON.stringify({ exp: Date.now() + 24 * 60 * 60 * 1000 });
-    const sig = await crypto.subtle.sign("HMAC", key, encoder.encode(payload));
+    const tokenB64 = btoa(payload);
+    const key = await crypto.subtle.importKey("raw", encoder.encode(pwd), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+    const sig = await crypto.subtle.sign("HMAC", key, encoder.encode(tokenB64));
     const sigHex = Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2, "0")).join("");
-    const token = btoa(payload) + "." + sigHex;
+    const token = tokenB64 + "." + sigHex;
     return Response.json({ success: true, token });
   } catch {
     return Response.json({ error: "服务器错误" }, { status: 500 });

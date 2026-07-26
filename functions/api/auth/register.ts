@@ -62,9 +62,10 @@ export async function onRequestPost(context: { request: Request; env: Env }) {
 
 async function createToken(username: string, hash: string): Promise<string> {
   const payload = JSON.stringify({ username, exp: Date.now() + 7 * 24 * 60 * 60 * 1000 });
+  const tokenB64 = btoa(payload);
   const encoder = new TextEncoder();
   const key = await crypto.subtle.importKey("raw", encoder.encode(hash.slice(0, 32)), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
-  const sig = await crypto.subtle.sign("HMAC", key, encoder.encode(payload));
+  const sig = await crypto.subtle.sign("HMAC", key, encoder.encode(tokenB64));
   const sigHex = Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2, "0")).join("");
-  return btoa(payload) + "." + sigHex;
+  return tokenB64 + "." + sigHex;
 }

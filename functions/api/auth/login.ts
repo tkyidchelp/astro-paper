@@ -74,10 +74,11 @@ export async function onRequestPost(context: { request: Request; env: Env }) {
     await env.BLOG_KV.delete(codeKey);
 
     const payload = JSON.stringify({ username, exp: Date.now() + 7 * 24 * 60 * 60 * 1000 });
+    const tokenB64 = btoa(payload);
     const cKey = await crypto.subtle.importKey("raw", encoder.encode(hashHex.slice(0, 32)), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
-    const sig = await crypto.subtle.sign("HMAC", cKey, encoder.encode(payload));
+    const sig = await crypto.subtle.sign("HMAC", cKey, encoder.encode(tokenB64));
     const sigHex = Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2, "0")).join("");
-    const token = btoa(payload) + "." + sigHex;
+    const token = tokenB64 + "." + sigHex;
 
     return Response.json({ success: true, token, username, createdAt: user.createdAt || null });
   } catch (e) {
