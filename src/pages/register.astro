@@ -13,8 +13,13 @@ import config from "@/config";
   <Main pageTitle="注册" class="app-prose">
     <div class="mx-auto max-w-sm space-y-4">
       <input id="reg-name" type="text" placeholder="用户名（2-20位）" class="border-border bg-background w-full rounded-md border px-3 py-2 text-sm outline-none focus:border-accent" />
+      <input id="reg-email" type="email" placeholder="邮箱地址" class="border-border bg-background w-full rounded-md border px-3 py-2 text-sm outline-none focus:border-accent" />
       <input id="reg-pass" type="password" placeholder="密码（至少6位）" class="border-border bg-background w-full rounded-md border px-3 py-2 text-sm outline-none focus:border-accent" />
       <input id="reg-pass2" type="password" placeholder="确认密码" class="border-border bg-background w-full rounded-md border px-3 py-2 text-sm outline-none focus:border-accent" />
+      <div class="flex gap-2">
+        <input id="reg-code" type="text" placeholder="邮箱验证码" class="border-border bg-background flex-1 rounded-md border px-3 py-2 text-sm outline-none focus:border-accent" />
+        <button id="send-code-btn" class="bg-accent text-background shrink-0 rounded-md px-3 py-2 text-xs font-medium hover:opacity-80 whitespace-nowrap">发送验证码</button>
+      </div>
       <button id="reg-btn" class="bg-accent text-background w-full rounded-md px-4 py-2 text-sm font-medium hover:opacity-80">注册</button>
       <p id="reg-msg" class="text-sm text-center"></p>
       <p class="text-muted text-sm text-center">已有账号？<a href="/login/" class="text-accent underline">登录</a></p>
@@ -27,17 +32,82 @@ import config from "@/config";
 function initReg() {
   var btn = document.getElementById("reg-btn");
   var msg = document.getElementById("reg-msg");
-  if (!btn || !msg) return;
+  var sendBtn = document.getElementById("send-code-btn");
+  if (!btn || !msg || !sendBtn) return;
+
+  sendBtn.addEventListener("click", function() {
+    var email = document.getElementById("reg-email").value.trim();
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      msg.textContent = "请输入有效的邮箱地址";
+      msg.className = "text-sm text-center text-red-500";
+      return;
+    }
+
+    sendBtn.disabled = true;
+    sendBtn.textContent = "发送中...";
+
+    fetch("/api/auth/send-code", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: email })
+    })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        if (d.error) {
+          msg.textContent = d.error;
+          msg.className = "text-sm text-center text-red-500";
+          sendBtn.disabled = false;
+          sendBtn.textContent = "发送验证码";
+          return;
+        }
+        msg.textContent = "验证码已发送";
+        msg.className = "text-sm text-center text-green-500";
+        sendBtn.textContent = "已发送";
+        setTimeout(function() {
+          sendBtn.textContent = "重新发送";
+          sendBtn.disabled = false;
+        }, 60000);
+      })
+      .catch(function() {
+        msg.textContent = "网络错误";
+        msg.className = "text-sm text-center text-red-500";
+        sendBtn.disabled = false;
+        sendBtn.textContent = "发送验证码";
+      });
+  });
 
   btn.addEventListener("click", function() {
     var name = document.getElementById("reg-name").value.trim();
+    var email = document.getElementById("reg-email").value.trim();
     var pass = document.getElementById("reg-pass").value;
     var pass2 = document.getElementById("reg-pass2").value;
+    var code = document.getElementById("reg-code").value.trim();
 
-    if (!name || !pass) { msg.textContent = "请填写所有字段"; msg.className = "text-sm text-center text-red-500"; return; }
-    if (name.length < 2 || name.length > 20) { msg.textContent = "用户名需 2-20 个字符"; msg.className = "text-sm text-center text-red-500"; return; }
-    if (pass.length < 6) { msg.textContent = "密码至少 6 位"; msg.className = "text-sm text-center text-red-500"; return; }
-    if (pass !== pass2) { msg.textContent = "两次密码不一致"; msg.className = "text-sm text-center text-red-500"; return; }
+    if (!name || !email || !pass || !code) {
+      msg.textContent = "请填写所有字段";
+      msg.className = "text-sm text-center text-red-500";
+      return;
+    }
+    if (name.length < 2 || name.length > 20) {
+      msg.textContent = "用户名需 2-20 个字符";
+      msg.className = "text-sm text-center text-red-500";
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      msg.textContent = "请输入有效的邮箱地址";
+      msg.className = "text-sm text-center text-red-500";
+      return;
+    }
+    if (pass.length < 6) {
+      msg.textContent = "密码至少 6 位";
+      msg.className = "text-sm text-center text-red-500";
+      return;
+    }
+    if (pass !== pass2) {
+      msg.textContent = "两次密码不一致";
+      msg.className = "text-sm text-center text-red-500";
+      return;
+    }
 
     msg.textContent = "注册中...";
     msg.className = "text-sm text-center text-muted";
@@ -45,7 +115,7 @@ function initReg() {
     fetch("/api/auth/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username: name, password: pass })
+      body: JSON.stringify({ username: name, password: pass, email: email, code: code })
     })
       .then(function(r) { return r.json(); })
       .then(function(d) {

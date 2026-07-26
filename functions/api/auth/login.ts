@@ -2,6 +2,11 @@ interface Env {
   BLOG_KV: KVNamespace;
 }
 
+function maskEmail(email: string): string {
+  const [name, domain] = email.split("@");
+  return name.slice(0, 1) + "***" + name.slice(-1) + "@" + domain;
+}
+
 async function verifyToken(token: string, env: Env): Promise<string | null> {
   try {
     const [payloadB64] = token.split(".");
@@ -27,7 +32,7 @@ async function verifyToken(token: string, env: Env): Promise<string | null> {
 export async function onRequestPost(context: { request: Request; env: Env }) {
   const { request, env } = context;
   try {
-    const { username, password } = await request.json() as { username: string; password: string };
+    const { username, password, code } = await request.json() as { username: string; password: string; code?: string };
     if (!username || !password) {
       return Response.json({ error: "请输入用户名和密码" }, { status: 400 });
     }
@@ -38,7 +43,7 @@ export async function onRequestPost(context: { request: Request; env: Env }) {
       return Response.json({ error: "用户名不存在" }, { status: 401 });
     }
 
-    const user = JSON.parse(raw) as { password: string };
+    const user = JSON.parse(raw) as { password: string; email: string; createdAt?: number };
     const encoder = new TextEncoder();
     const hashBuffer = await crypto.subtle.digest("SHA-256", encoder.encode(username + ":" + password));
     const hashArray = Array.from(new Uint8Array(hashBuffer));
@@ -47,6 +52,26 @@ export async function onRequestPost(context: { request: Request; env: Env }) {
     if (hashHex !== user.password) {
       return Response.json({ error: "密码错误" }, { status: 401 });
     }
+
+    if (!code) {
+      return Response.json({ needCode: true, maskedEmail: maskEmail(user.email) });
+    }
+
+    const codeKey = "code:" + user.email.toLowerCase();
+    const storedRaw = await env.BLOG_KV.get(codeKey);
+    if (!storedRaw) {
+      return Response.json({ error: "请先发送验证码" }, { status: 400 });
+    }
+    const stored = JSON.parse(storedRaw) as { code: string; exp: number; tries: number };
+    if (Date.now() > stored.exp) return Response.json({ error: "验证码已过期" }, { status: 400 });
+    if (stored.tries >= 3) return Response.json({ error: "验证码错误次数过多，请重新获取" }, { status: 400 });
+    if (stored.code !== code) {
+      stored.tries++;
+      await env.BLOG_KV.put(codeKey, JSON.stringify(stored));
+      return Response.json({ error: "验证码错误" }, { status: 400 });
+    }
+
+    await env.BLOG_KV.delete(codeKey);
 
     const payload = JSON.stringify({ username, exp: Date.now() + 7 * 24 * 60 * 60 * 1000 });
     const cKey = await crypto.subtle.importKey("raw", encoder.encode(hashHex.slice(0, 32)), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
