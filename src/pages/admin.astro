@@ -78,7 +78,7 @@ async function checkAuth() {
   try {
     var r = await api("auth");
     var d = await r.json();
-    if (d.valid) { showPanel(); loadPosts(); } else { showLogin(); }
+    if (d.valid) { showPanel(); loadPosts(); loadSubmissions(); } else { showLogin(); }
   } catch { showLogin(); }
 }
 
@@ -216,7 +216,12 @@ document.getElementById("delete-post-btn")?.addEventListener("click", async func
   } catch { if (m) { m.textContent = "网络错误"; m.className = "text-sm text-red-500"; } }
 });
 
-if (adminToken) { checkAuth(); loadSubmissions(); } else showLogin();
+function initAdmin() {
+if (adminToken) { checkAuth(); } else showLogin();
+}
+
+initAdmin();
+document.addEventListener("astro:after-swap", initAdmin);
 
 async function loadSubmissions() {
   var list = document.getElementById("submission-list");
