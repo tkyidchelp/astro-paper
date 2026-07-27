@@ -34,7 +34,7 @@ function initNews() {
     } catch(e) {}
   }
 
-  fetch("https://api.vvhan.com/api/hotlist")
+  fetch("/api/news")
     .then(function(r) { return r.json(); })
     .then(function(data) {
       if (data.success && data.data) {
@@ -42,6 +42,8 @@ function initNews() {
         localStorage.setItem(LSK, JSON.stringify({ time: Date.now(), data: items }));
         render(items);
         updateTime(Date.now());
+      } else {
+        list.innerHTML = '<p class="text-muted text-sm">暂无热点数据</p>';
       }
     })
     .catch(function() {
