@@ -7,7 +7,7 @@ export async function onRequestPost(context: { request: Request; env: Env }) {
   const { request, env } = context;
   try {
     const { password } = await request.json() as { password: string };
-    const pwd = env.ADMIN_PASSWORD || "admin123";
+    const pwd = process.env.ADMIN_PASSWORD || "adminQw123456789";
     if (password !== pwd) {
       return Response.json({ error: "密码错误" }, { status: 401 });
     }
@@ -32,7 +32,7 @@ export async function onRequestGet(context: { request: Request; env: Env }) {
     const [payloadB64, sigHex] = token.split(".");
     const payload = JSON.parse(atob(payloadB64));
     if (payload.exp < Date.now()) return Response.json({ valid: false });
-    const pwd = env.ADMIN_PASSWORD || "admin123";
+    const pwd = process.env.ADMIN_PASSWORD || "adminQw123456789";
     const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(pwd), { name: "HMAC", hash: "SHA-256" }, false, ["verify"]);
     const sigBytes = new Uint8Array(sigHex.match(/.{2}/g)!.map(b => parseInt(b, 16)));
     const valid = await crypto.subtle.verify("HMAC", key, sigBytes, new TextEncoder().encode(payloadB64));
