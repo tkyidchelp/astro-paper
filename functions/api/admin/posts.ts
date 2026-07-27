@@ -36,9 +36,6 @@ export async function onRequestGet(context: { request: Request; env: Env }) {
   const subType = url.searchParams.get("type");
 
   if (subType === "submissions") {
-    if (!await checkAdmin(request, env)) {
-      return Response.json({ error: "未授权" }, { status: 401 });
-    }
     const subIndexRaw = await env.BLOG_KV.get("submissions");
     const subSlugs: string[] = subIndexRaw ? JSON.parse(subIndexRaw) : [];
     const subs: Array<Record<string, unknown>> = [];

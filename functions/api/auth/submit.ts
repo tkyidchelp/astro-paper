@@ -51,7 +51,7 @@ async function aiReview(title: string, content: string, tags: string[], apiKey: 
         "Authorization": "Bearer " + apiKey
       },
       body: JSON.stringify({
-        model: "gemini-2.5-flash",
+        model: "agnes-2.0-flash",
         messages: [
           { role: "system", content: "你是内容审核助手，只回复 JSON。" },
           { role: "user", content: prompt }

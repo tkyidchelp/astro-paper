@@ -1,0 +1,68 @@
+---
+import Layout from "@/layouts/Layout.astro";
+import Header from "@/components/Header.astro";
+import Footer from "@/components/Footer.astro";
+import Breadcrumb from "@/components/Breadcrumb.astro";
+import Main from "@/components/Main.astro";
+import config from "@/config";
+---
+
+<Layout title={`用户投稿 | ${config.site.title}`}>
+  <Header />
+  <Breadcrumb />
+  <Main pageTitle="用户投稿专栏" class="app-prose">
+    <div class="mx-auto max-w-3xl">
+      <p class="text-muted mb-6">以下文章由社区用户投稿，经审核后发布。欢迎在<a href="/profile/" class="text-accent underline">个人中心</a>投稿。</p>
+      <div id="subs-list" class="space-y-4">
+        <p class="text-muted text-center py-8">加载中...</p>
+      </div>
+    </div>
+  </Main>
+  <Footer />
+</Layout>
+
+<script is:inline>
+function initSubs() {
+  var list = document.getElementById("subs-list");
+  if (!list) return;
+
+  fetch("/api/admin/posts?type=submissions")
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.error || !Array.isArray(data)) {
+        list.innerHTML = '<p class="text-muted text-center py-8">暂无投稿</p>';
+        return;
+      }
+      var approved = data.filter(function(s) { return s.status === "approved"; });
+      if (approved.length === 0) {
+        list.innerHTML = '<p class="text-muted text-center py-8">暂无已审核的投稿</p>';
+        return;
+      }
+
+      var html = approved.map(function(s) {
+        var date = s.pubDatetime ? new Date(s.pubDatetime).toLocaleDateString("zh-CN") : "";
+        var tagsHtml = (s.tags || []).map(function(t) {
+          return '<span class="text-accent text-xs mr-1">#' + t + '</span>';
+        }).join("");
+
+        return '<a href="/post-view/?slug=' + s.slug + '" class="border-border bg-background block rounded-lg border p-5 hover:border-accent transition-colors">' +
+          '<h2 class="text-lg font-semibold mb-1">' + escHtml(s.title || "") + '</h2>' +
+          '<p class="text-muted text-sm mb-2">' + escHtml(s.description || "").slice(0, 120) + '</p>' +
+          '<div class="flex items-center justify-between text-xs">' +
+          '<span class="text-muted">' + (s.username || "匿名") + ' · ' + date + '</span>' +
+          '<span>' + tagsHtml + '</span>' +
+          '</div></a>';
+      }).join("");
+
+      list.innerHTML = html;
+    })
+    .catch(function() {
+      list.innerHTML = '<p class="text-muted text-center py-8">加载失败</p>';
+    });
+}
+
+function escHtml(s) { return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+
+initSubs();
+document.addEventListener("astro:after-swap", initSubs);
+</script>
