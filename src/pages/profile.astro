@@ -33,6 +33,21 @@ import config from "@/config";
             退出登录
           </button>
         </div>
+
+        <div class="border-border bg-background rounded-lg border p-6 space-y-4">
+          <h2 class="text-xl font-semibold">我要投稿</h2>
+          <input id="sub-title" type="text" placeholder="文章标题" class="border-border bg-background w-full rounded-md border px-3 py-2 text-sm outline-none focus:border-accent" />
+          <textarea id="sub-content" rows="8" placeholder="文章内容（支持 Markdown）" class="border-border bg-background w-full rounded-md border px-3 py-2 text-sm outline-none focus:border-accent"></textarea>
+          <input id="sub-tags" type="text" placeholder="标签（逗号分隔）" class="border-border bg-background w-full rounded-md border px-3 py-2 text-sm outline-none focus:border-accent" />
+          <button id="submit-btn" class="bg-accent text-background w-full rounded-md px-4 py-2 text-sm font-medium hover:opacity-80">提交投稿</button>
+          <p id="sub-msg" class="text-sm text-center"></p>
+        </div>
+
+        <div class="border-border bg-background rounded-lg border p-6 space-y-4">
+          <h2 class="text-xl font-semibold">我的投稿</h2>
+          <div id="my-subs" class="space-y-3"></div>
+          <p id="no-subs" class="text-muted text-sm hidden">暂无投稿</p>
+        </div>
       </div>
 
       <div id="profile-loading" class="text-center py-12">
@@ -87,6 +102,73 @@ function initProfile() {
     localStorage.removeItem("blog-user");
     localStorage.removeItem("blog-created");
     window.location.href = "/login/";
+  });
+
+  loadSubmissions();
+  setupSubmit();
+}
+
+function loadSubmissions() {
+  var token = localStorage.getItem("blog-token");
+  if (!token) return;
+  fetch("/api/auth/submit", { headers: { "Authorization": "Bearer " + token } })
+    .then(function(r) { return r.json(); })
+    .then(function(subs) {
+      var list = document.getElementById("my-subs");
+      var empty = document.getElementById("no-subs");
+      if (!subs || subs.length === 0) {
+        if (empty) empty.classList.remove("hidden");
+        return;
+      }
+      if (empty) empty.classList.add("hidden");
+      var html = "";
+      subs.forEach(function(s) {
+        var statusLabel = s.status === "pending" ? "审核中" : s.status === "approved" ? "已通过" : "已拒绝";
+        var statusColor = s.status === "pending" ? "text-yellow-500" : s.status === "approved" ? "text-green-500" : "text-red-500";
+        html += '<div class="border-border rounded-md border p-3"><div class="flex items-center justify-between"><span class="font-medium truncate flex-1">' + escHtml(s.title || "") + '</span><span class="' + statusColor + ' text-xs shrink-0 ml-2">' + statusLabel + '</span></div><div class="text-muted text-xs mt-1">' + (s.description || "").slice(0, 60) + '</div>' + (s.aiReview ? '<div class="text-muted text-xs mt-1 italic">AI 审核: ' + escHtml(s.aiReview) + '</div>' : '') + '</div>';
+      });
+      if (list) list.innerHTML = html;
+    })
+    .catch(function() {});
+}
+
+function escHtml(s) { return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+
+function setupSubmit() {
+  var btn = document.getElementById("submit-btn");
+  var msg = document.getElementById("sub-msg");
+  if (!btn || !msg) return;
+
+  btn.addEventListener("click", function() {
+    var token = localStorage.getItem("blog-token");
+    if (!token) { msg.textContent = "请先登录"; msg.className = "text-sm text-center text-red-500"; return; }
+
+    var title = document.getElementById("sub-title").value.trim();
+    var content = document.getElementById("sub-content").value.trim();
+    var tagsStr = document.getElementById("sub-tags").value.trim();
+
+    if (!title || !content) { msg.textContent = "标题和内容不能为空"; msg.className = "text-sm text-center text-red-500"; return; }
+
+    var tags = tagsStr ? tagsStr.split(",").map(function(t) { return t.trim(); }).filter(function(t) { return t; }) : [];
+    msg.textContent = "提交中...";
+    msg.className = "text-sm text-center text-muted";
+
+    fetch("/api/auth/submit", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
+      body: JSON.stringify({ title: title, content: content, tags: tags, description: content.slice(0, 100).replace(/[#*`\n]/g, "") })
+    })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        if (d.error) { msg.textContent = d.error; msg.className = "text-sm text-center text-red-500"; return; }
+        msg.textContent = "投稿成功，等待审核";
+        msg.className = "text-sm text-center text-green-500";
+        document.getElementById("sub-title").value = "";
+        document.getElementById("sub-content").value = "";
+        document.getElementById("sub-tags").value = "";
+        loadSubmissions();
+      })
+      .catch(function() { msg.textContent = "网络错误"; msg.className = "text-sm text-center text-red-500"; });
   });
 }
 

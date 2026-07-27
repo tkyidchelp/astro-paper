@@ -27,6 +27,13 @@ import config from "@/config";
         <p class="text-muted text-center py-8">加载中...</p>
       </div>
 
+      <div id="submission-section" class="mb-8">
+        <h2 class="text-lg font-semibold mb-3">投稿审核</h2>
+        <div id="submission-list" class="space-y-2">
+          <p class="text-muted text-center py-4">加载中...</p>
+        </div>
+      </div>
+
       <div id="post-editor" class="hidden border-border bg-background rounded-lg border p-6 space-y-4">
         <h2 id="editor-title-label" class="text-lg font-semibold">新建文章</h2>
         <input id="edit-title" type="text" placeholder="文章标题" class="border-border bg-background w-full rounded-md border px-3 py-2 text-sm outline-none focus:border-accent" />
@@ -209,5 +216,42 @@ document.getElementById("delete-post-btn")?.addEventListener("click", async func
   } catch { if (m) { m.textContent = "网络错误"; m.className = "text-sm text-red-500"; } }
 });
 
-if (adminToken) checkAuth(); else showLogin();
+if (adminToken) { checkAuth(); loadSubmissions(); } else showLogin();
+
+async function loadSubmissions() {
+  var list = document.getElementById("submission-list");
+  if (!list) return;
+  try {
+    var r = await api("posts?type=submissions");
+    var subs = await r.json();
+    if (subs.error) { list.innerHTML = '<p class="text-red-500">加载失败</p>'; return; }
+    if (subs.length === 0) { list.innerHTML = '<p class="text-muted text-center py-4">暂无投稿</p>'; return; }
+    list.innerHTML = subs.map(function(s) {
+      var statusLabel = s.status === "pending" ? "待审核" : s.status === "approved" ? "已通过" : "已拒绝";
+      var statusColor = s.status === "pending" ? "#eab308" : s.status === "approved" ? "#22c55e" : "#ef4444";
+      var btns = s.status === "pending"
+        ? '<button data-slug="' + s.slug + '" data-action="approved" class="approve-btn text-green-500 text-xs hover:underline mr-2">通过</button><button data-slug="' + s.slug + '" data-action="rejected" class="reject-btn text-red-500 text-xs hover:underline">拒绝</button>'
+        : '<span class="text-muted text-xs">已处理</span>';
+      return '<div class="border-border rounded-md border p-3"><div class="flex items-center justify-between"><div><span class="font-medium">' + (s.title || "") + '</span><span class="text-muted text-xs ml-2">by ' + (s.username || "") + '</span></div><span style="color:' + statusColor + '" class="text-xs">' + statusLabel + '</span></div><div class="text-muted text-xs mt-1 truncate">' + (s.description || "").slice(0, 80) + '</div>' + (s.aiReview ? '<div class="text-muted text-xs mt-1 italic">AI: ' + s.aiReview + '</div>' : '') + '<div class="mt-2">' + btns + '</div></div>';
+    }).join("");
+
+    list.querySelectorAll(".approve-btn").forEach(function(btn) {
+      btn.addEventListener("click", function() { reviewSubmission(btn.dataset.slug || "", "approved"); });
+    });
+    list.querySelectorAll(".reject-btn").forEach(function(btn) {
+      btn.addEventListener("click", function() { reviewSubmission(btn.dataset.slug || "", "rejected"); });
+    });
+  } catch { list.innerHTML = '<p class="text-red-500">加载失败</p>'; }
+}
+
+async function reviewSubmission(slug, status) {
+  try {
+    await api("posts", {
+      method: "POST",
+      body: JSON.stringify({ action: "review", slug: slug, status: status })
+    });
+    loadSubmissions();
+    loadPosts();
+  } catch {}
+}
 </script>
