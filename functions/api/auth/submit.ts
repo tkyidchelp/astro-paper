@@ -1,6 +1,7 @@
 interface Env {
   BLOG_KV: KVNamespace;
   AGNES_API_KEY: string;
+  RESEND_KEY: string;
 }
 
 interface Submission {
@@ -29,20 +30,42 @@ async function getUser(request: Request): Promise<string | null> {
   }
 }
 
+async function sendEmail(env: Env, subject: string, html: string) {
+  const key = env.RESEND_KEY;
+  if (!key) return;
+  try {
+    await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer " + key
+      },
+      body: JSON.stringify({
+        from: "杨宏轩的个人博客 <admin@yangchen.skin>",
+        to: ["tkyidc@163.com"],
+        subject,
+        html
+      })
+    });
+  } catch {}
+}
+
 async function aiReview(title: string, content: string, tags: string[], apiKey: string): Promise<string> {
   try {
-    const prompt = `你是一个博客内容审核助手。请审核以下用户投稿，判断是否适合发布在技术博客上。
+    const prompt = `你是一个博客内容审核助手。审核用户投稿，默认宽松通过。
 
-审核标准：
-1. 内容是否有实质价值（不是灌水、广告、无意义内容）
-2. 是否涉及政治敏感、色情、暴力等违规内容
-3. 是否基本通顺可读
+审核原则：只要不是明显的广告、垃圾信息、政治敏感或违法内容，一律通过。文字不通顺也可以给过，低质量内容也可以通过。宁可宽松通过，不要误杀正常内容。
+
+唯一需要拒绝的情况：
+- 明显的广告推广
+- 政治敏感内容
+- 色情暴力违法内容
 
 标题：${title}
 标签：${tags.join(", ")}
 内容（前500字）：${content.slice(0, 500)}
 
-请以 JSON 格式回复：{"approved": true/false, "reason": "审核意见（中文，30字以内）"}。只返回 JSON，不要其他内容。`;
+请以 JSON 格式回复：{"approved": true/false, "reason": "审核意见（中文，20字以内）"}。只返回 JSON。`;
 
     const res = await fetch("https://apihub.agnes-ai.com/v1/chat/completions", {
       method: "POST",
@@ -53,7 +76,7 @@ async function aiReview(title: string, content: string, tags: string[], apiKey: 
       body: JSON.stringify({
         model: "agnes-2.0-flash",
         messages: [
-          { role: "system", content: "你是内容审核助手，只回复 JSON。" },
+          { role: "system", content: "你是博客审核助手，默认宽松通过，只回复 JSON。" },
           { role: "user", content: prompt }
         ],
         temperature: 0.1,
@@ -64,10 +87,10 @@ async function aiReview(title: string, content: string, tags: string[], apiKey: 
     const data = await res.json() as { choices?: Array<{ message?: { content?: string } }> };
     const text = data.choices?.[0]?.message?.content || "";
     const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) return JSON.stringify({ approved: false, reason: "AI 审核异常，留待人工审核" });
+    if (!jsonMatch) return JSON.stringify({ approved: true, reason: "AI 审核通过（默认宽松）" });
     return jsonMatch[0];
   } catch {
-    return JSON.stringify({ approved: false, reason: "AI 服务不可用，留待人工审核" });
+    return JSON.stringify({ approved: true, reason: "AI 不可用，默认通过" });
   }
 }
 
@@ -84,14 +107,17 @@ export async function onRequestPost(context: { request: Request; env: Env }) {
 
     const slug = username + "-" + Date.now().toString(36) + "-" + title.replace(/[^a-zA-Z0-9\u4e00-\u9fa5]+/g, "-").replace(/^-|-$/g, "").toLowerCase().slice(0, 40);
 
-    const apiKey = env.AGNES_API_KEY || "sk-PgeyxlzEeR5dl8P564bchKOemwXfKkwqmQCustpcCIp9axfc";
+    const apiKey = env.AGNES_API_KEY;
+    if (!apiKey) {
+      return Response.json({ error: "AI 审核服务未配置" }, { status: 500 });
+    }
 
     const reviewRaw = await aiReview(title, content, tags || [], apiKey);
     let reviewResult: { approved: boolean; reason: string };
     try {
       reviewResult = JSON.parse(reviewRaw);
     } catch {
-      reviewResult = { approved: false, reason: "AI 审核异常" };
+      reviewResult = { approved: true, reason: "AI 审核解析异常，默认通过" };
     }
 
     const status: Submission["status"] = reviewResult.approved ? "approved" : "pending";
@@ -120,6 +146,11 @@ export async function onRequestPost(context: { request: Request; env: Env }) {
     const userIndex: string[] = userIndexRaw ? JSON.parse(userIndexRaw) : [];
     userIndex.push(slug);
     await env.BLOG_KV.put("user:" + username + ":submissions", JSON.stringify(userIndex));
+
+    if (status === "approved") {
+      const emailHtml = '<h2>新投稿已自动通过</h2><p><strong>标题：</strong>' + title + '</p><p><strong>作者：</strong>' + username + '</p><p><strong>AI 审核：</strong>' + reviewResult.reason + '</p><p><strong>标签：</strong>' + (tags || []).join(", ") + '</p><hr><div>' + content.replace(/\n/g, "<br>") + '</div>';
+      sendEmail(env, "新投稿通过：" + title, emailHtml);
+    }
 
     return Response.json({
       success: true,

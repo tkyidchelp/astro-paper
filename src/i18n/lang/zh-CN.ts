@@ -7,6 +7,7 @@ export default {
     tags: "标签",
     about: "关于",
     archives: "归档",
+    downloads: "下载",
     search: "搜索",
   },
   post: {

@@ -1,0 +1,114 @@
+---
+import Layout from "@/layouts/Layout.astro";
+import Header from "@/components/Header.astro";
+import Footer from "@/components/Footer.astro";
+import config from "@/config";
+---
+
+<Layout
+  title={"下载 | " + config.site.title}
+  description="R2 资源下载中心"
+>
+  <Header />
+
+  <main id="main-content" class="app-layout mt-8 mb-16">
+    <h1 class="text-3xl font-bold mb-8">下载</h1>
+
+    <div class="app-prose mb-8">
+      <p>文件存储在 Cloudflare R2 桶中。管理员可上传/删除文件。</p>
+    </div>
+
+    <div id="upload-section" class="mb-8 p-6 border border-border rounded-lg hidden">
+      <h2 class="text-xl font-semibold mb-4">上传文件</h2>
+      <form id="upload-form" class="flex flex-col gap-4">
+        <input type="file" id="file-input" class="file:mr-4 file:px-4 file:py-2 file:border-0 file:rounded file:bg-accent file:text-white" />
+        <div class="flex gap-3">
+          <button type="submit" class="px-4 py-2 bg-accent text-white rounded hover:opacity-80">上传</button>
+          <span id="upload-msg" class="self-center text-sm text-muted"></span>
+        </div>
+      </form>
+    </div>
+
+    <div id="file-list" class="space-y-3">
+      <p class="text-muted">加载中...</p>
+    </div>
+  </main>
+
+  <Footer />
+</Layout>
+
+<script>
+  function formatSize(bytes: number) {
+    if (bytes < 1024) return bytes + " B";
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+    return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+  }
+
+  function formatDate(d: string) {
+    return new Date(d).toLocaleString("zh-CN");
+  }
+
+  async function loadList() {
+    var el = document.getElementById("file-list")!;
+    try {
+      var res = await fetch("/api/storage/list");
+      if (!res.ok) throw new Error("");
+      var files: Array<{ key: string; size: number; uploaded: string }> = await res.json();
+      if (files.length === 0) {
+        el.innerHTML = '<p class="text-muted">暂无文件</p>';
+        return;
+      }
+      el.innerHTML = files.map(function(f) {
+        return '<div class="flex items-center justify-between p-4 border border-border rounded-lg hover:bg-card/50 transition"><div class="flex-1"><a href="/api/storage/download/' + encodeURIComponent(f.key) + '" class="text-accent hover:underline font-medium">' + f.key + '</a><div class="text-xs text-muted mt-1">' + formatSize(f.size) + ' - ' + formatDate(f.uploaded) + '</div></div><button class="del-btn ml-4 px-3 py-1 text-xs text-red-400 border border-red-400/30 rounded hover:bg-red-400/10 hidden" data-key="' + f.key + '">删除</button></div>';
+      }).join("");
+      initDeleteBtns();
+    } catch {
+      el.innerHTML = '<p class="text-muted">加载失败</p>';
+    }
+  }
+
+  function initUpload() {
+    var token = localStorage.getItem("blog-token");
+    var user = localStorage.getItem("blog-user");
+    if (!token || user !== "admin") return;
+    document.getElementById("upload-section")!.classList.remove("hidden");
+    document.getElementById("upload-form")!.addEventListener("submit", async function(e) {
+      e.preventDefault();
+      var input = document.getElementById("file-input") as HTMLInputElement;
+      var msg = document.getElementById("upload-msg")!;
+      var file = input.files?.[0];
+      if (!file) { msg.textContent = "请选择文件"; return; }
+      msg.textContent = "上传中...";
+      var fd = new FormData();
+      fd.append("file", file);
+      var res = await fetch("/api/storage/upload", { method: "POST", headers: { Authorization: "Bearer " + token }, body: fd });
+      var data = await res.json();
+      if (data.success) { msg.textContent = "上传成功"; input.value = ""; loadList(); }
+      else { msg.textContent = data.error || "上传失败"; }
+    });
+  }
+
+  function initDeleteBtns() {
+    var token = localStorage.getItem("blog-token");
+    var user = localStorage.getItem("blog-user");
+    if (!token || user !== "admin") return;
+    document.querySelectorAll(".del-btn").forEach(function(btn) {
+      btn.classList.remove("hidden");
+      btn.addEventListener("click", async function() {
+        var key = (btn as HTMLElement).dataset.key;
+        if (!confirm("确认删除 " + key + " 吗？")) return;
+        var res = await fetch("/api/storage/upload", { method: "DELETE", headers: { "Content-Type": "application/json", Authorization: "Bearer " + token }, body: JSON.stringify({ key }) });
+        var data = await res.json();
+        if (data.success) loadList();
+      });
+    });
+  }
+
+  loadList();
+  initUpload();
+
+  document.addEventListener("astro:after-swap", function() {
+    loadList();
+    initUpload();
+  });
+</script>

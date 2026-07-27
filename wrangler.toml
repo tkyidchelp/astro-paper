@@ -4,3 +4,7 @@ compatibility_date = "2025-01-01"
 [[kv_namespaces]]
 binding = "BLOG_KV"
 id = "43138b8855894064ac51c25e6cbc638f"
+
+[[r2_buckets]]
+binding = "BLOG_R2"
+bucket_name = "blog-downloads"

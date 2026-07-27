@@ -34,6 +34,18 @@ import config from "@/config";
         </div>
       </div>
 
+      <div id="r2-section" class="mb-8">
+        <h2 class="text-lg font-semibold mb-3">下载管理 (R2)</h2>
+        <div class="flex gap-2 mb-3">
+          <input type="file" id="r2-file-input" class="border-border bg-background flex-1 rounded-md border px-3 py-2 text-sm file:mr-3" />
+          <button id="r2-upload-btn" class="bg-accent text-background rounded-md px-4 py-2 text-sm font-medium hover:opacity-80">上传</button>
+        </div>
+        <span id="r2-upload-msg" class="text-sm text-muted"></span>
+        <div id="r2-file-list" class="space-y-2 mt-3">
+          <p class="text-muted text-center py-4">加载中...</p>
+        </div>
+      </div>
+
       <div id="post-editor" class="hidden border-border bg-background rounded-lg border p-6 space-y-4">
         <h2 id="editor-title-label" class="text-lg font-semibold">新建文章</h2>
         <input id="edit-title" type="text" placeholder="文章标题" class="border-border bg-background w-full rounded-md border px-3 py-2 text-sm outline-none focus:border-accent" />
@@ -255,8 +267,71 @@ async function reviewSubmission(slug, status) {
       method: "POST",
       body: JSON.stringify({ action: "review", slug: slug, status: status })
     });
-    loadSubmissions();
-    loadPosts();
-  } catch {}
+loadSubmissions();
+loadPosts();
+} catch {}
 }
+
+// R2 管理
+var r2ListEl = document.getElementById("r2-file-list");
+var r2MsgEl = document.getElementById("r2-upload-msg");
+var r2FileInput = document.getElementById("r2-file-input");
+var r2UploadBtn = document.getElementById("r2-upload-btn");
+
+// 先获取 token：优先用 admin-token，其次用 blog-token
+function getStorageToken() {
+  var at = localStorage.getItem("admin-token");
+  if (at) return "Bearer " + at;
+  var bt = localStorage.getItem("blog-token");
+  if (bt) return "Bearer " + bt;
+  return "";
+}
+
+async function loadR2Files() {
+  try {
+    var res = await fetch("/api/storage/list");
+    if (!res.ok) throw new Error();
+    var files = await res.json();
+    r2ListEl.innerHTML = "";
+    if (!files || files.length === 0) {
+      r2ListEl.innerHTML = '<p class="text-muted text-center py-2">暂无文件</p>';
+      return;
+    }
+    files.forEach(function(f) {
+      var div = document.createElement("div");
+      div.className = "border-border bg-background rounded-md border px-3 py-2 flex items-center justify-between text-sm";
+      var truncated = f.key.length > 30 ? f.key.slice(0, 27) + "..." : f.key;
+      div.innerHTML = '<span class="text-muted truncate">' + truncated + '</span><span class="text-xs text-muted ml-2">' + f.size + 'B</span>';
+      var token = getStorageToken();
+      if (token) {
+        var btn = document.createElement("button");
+        btn.className = "ml-2 text-red-500 text-xs hover:underline";
+        btn.textContent = "删除";
+        btn.addEventListener("click", function() {
+          if (!confirm("确认删除 " + f.key + " 吗？")) return;
+          fetch("/api/storage/upload", { method: "DELETE", headers: { Authorization: token, "Content-Type": "application/json" }, body: JSON.stringify({ key: f.key }) }).then(function() { loadR2Files(); });
+        });
+        div.appendChild(btn);
+      }
+      r2ListEl.appendChild(div);
+    });
+  } catch { r2ListEl.innerHTML = '<p class="text-red-500">加载失败</p>'; }
+}
+
+r2UploadBtn.addEventListener("click", async function() {
+  if (!r2FileInput.files.length) { r2MsgEl.textContent = "请选择文件"; r2MsgEl.className = "text-sm text-red-500"; return; }
+  var file = r2FileInput.files[0];
+  var token = getStorageToken();
+  if (!token) { r2MsgEl.textContent = "请先登录"; r2MsgEl.className = "text-sm text-red-500"; return; }
+  r2MsgEl.textContent = "上传中...";
+  r2MsgEl.className = "text-sm text-blue-500";
+  var fd = new FormData();
+  fd.append("file", file);
+  var res = await fetch("/api/storage/upload", { method: "POST", headers: { Authorization: token }, body: fd });
+  var data = await res.json();
+  if (data.success) { r2MsgEl.textContent = "上传成功"; r2MsgEl.className = "text-sm text-green-500"; r2FileInput.value = ""; loadR2Files(); }
+  else { r2MsgEl.textContent = data.error || "上传失败"; r2MsgEl.className = "text-sm text-red-500"; }
+});
+
+loadR2Files();
 </script>
