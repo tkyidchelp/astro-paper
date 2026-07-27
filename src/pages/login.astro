@@ -99,7 +99,7 @@ function initLogin() {
       .then(function(d) {
         if (d.needCode) {
           needCode = true;
-          emailForCode = d.maskedEmail;
+          emailForCode = d.emailForCode;
           codeSection.classList.remove("hidden");
           maskedEmail.textContent = "验证码将发送至: " + d.maskedEmail;
           msg.textContent = "请输入邮箱验证码";

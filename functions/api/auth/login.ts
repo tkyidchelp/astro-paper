@@ -54,7 +54,7 @@ export async function onRequestPost(context: { request: Request; env: Env }) {
     }
 
     if (!code) {
-      return Response.json({ needCode: true, maskedEmail: maskEmail(user.email) });
+      return Response.json({ needCode: true, emailForCode: user.email, maskedEmail: maskEmail(user.email) });
     }
 
     const codeKey = "code:" + user.email.toLowerCase();
